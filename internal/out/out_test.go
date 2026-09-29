@@ -220,6 +220,30 @@ func TestAnErrorOpeningWithANameKeepsItsCase(t *testing.T) {
 	}
 }
 
+func TestAHelpLineEndsInAPeriod(t *testing.T) {
+	for _, e := range []*Error{
+		{Code: "lock-stale", Message: "the lock is stale", Help: "run `shulker lock`"},
+		{Code: "usage", Message: "too many arguments", UsageCommand: "shulker add"},
+		{Code: "lock-stale", Message: "the lock is stale", Help: "is it stale?"},
+	} {
+		var human bytes.Buffer
+		(&Printer{Stdout: &bytes.Buffer{}, Stderr: &human}).Report(e)
+		help := human.String()[strings.Index(human.String(), "help"):]
+		help, _, _ = strings.Cut(help, "\n")
+		if strings.HasSuffix(help, "..") || !strings.HasSuffix(help, ".") && !strings.HasSuffix(help, "?") {
+			t.Errorf("help line %q", help)
+		}
+	}
+}
+
+func TestAPlainErrorsHelpEndsInAPeriod(t *testing.T) {
+	var human bytes.Buffer
+	(&Printer{Stdout: &bytes.Buffer{}, Stderr: &human}).Report(&Error{Code: "lock-stale", Message: "the lock is stale", Help: "run `shulker lock`", IsPlain: true})
+	if !strings.Contains(human.String(), "run `shulker lock`.\n") {
+		t.Fatalf("got %q", human.String())
+	}
+}
+
 func TestTildeShortensHomePathsButNotLinkTargets(t *testing.T) {
 	dir := home()
 	if dir == "" {

@@ -425,9 +425,9 @@ func (l *Lines) Error(e *Error) {
 	}
 	switch {
 	case e.Help != "":
-		rows = append(rows, Row{Label: "help", Text: Sentence(e.Help)})
+		rows = append(rows, Row{Label: "help", Text: Period(Sentence(e.Help))})
 	case e.UsageCommand != "":
-		rows = append(rows, Row{Label: "help", Text: t.Command(e.UsageCommand+" --help") + " lists every flag"})
+		rows = append(rows, Row{Label: "help", Text: t.Command(e.UsageCommand+" --help") + " lists every flag."})
 	}
 	l.Tree(rows...)
 	if e.Nudge.Command != "" {
@@ -451,7 +451,7 @@ func (l *Lines) plainError(e *Error) {
 		}
 	}
 	if e.Help != "" {
-		l.Raw(e.Help)
+		l.Raw(Period(e.Help))
 	}
 	if e.Nudge.Command != "" {
 		l.Blank()

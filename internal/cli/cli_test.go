@@ -283,7 +283,7 @@ func TestGroupCommandsReportUnknownSubcommands(t *testing.T) {
 
 func TestUsageErrorsShowUsageAndPointAtHelp(t *testing.T) {
 	_, _, stderr := run(t, "add")
-	if !strings.HasSuffix(stderr, "\n    ├─ usage: shulker add <mod|source>... [flags]\n    ╰─ help: shulker add --help lists every flag\n") {
+	if !strings.HasSuffix(stderr, "\n    ├─ usage: shulker add <mod|source>... [flags]\n    ╰─ help: shulker add --help lists every flag.\n") {
 		t.Fatalf("stderr:\n%s", stderr)
 	}
 	if strings.Contains(stderr, "Flags") || strings.Contains(stderr, "Examples") || strings.HasSuffix(stderr, "\n\n") {

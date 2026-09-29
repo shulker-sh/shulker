@@ -135,6 +135,14 @@ func Sentence(text string) string {
 	return string(unicode.ToUpper(r)) + text[size:]
 }
 
+// Period ends text as a sentence, unless it already ends in a stop of its own.
+func Period(text string) string {
+	if text == "" || strings.ContainsAny(text[len(text)-1:], ".?!") {
+		return text
+	}
+	return text + "."
+}
+
 // opensWithValue reports whether a format starts with a substituted value, which keeps its own
 // case: `%s is already in the pack` names a mod.
 func opensWithValue(format string) bool { return strings.HasPrefix(format, "%") }
