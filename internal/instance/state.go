@@ -55,6 +55,46 @@ type State struct {
 	LauncherImage string `json:"launcherImage,omitempty"`
 	// Takedowns is the last takedown check a sync ran for the directory, which a build warns from.
 	Takedowns *Takedowns `json:"takedowns,omitempty"`
+	// Entries are the lock entries the last build placed from, which the next sync's changes are
+	// found against; nil before any build recorded them.
+	Entries []LockedEntry `json:"entries,omitempty"`
+	// Changelog is what each sync of the last month brought, oldest first, for the marker.
+	Changelog []Changes `json:"changelog,omitempty"`
+}
+
+// LockedEntry is one entry of a lock, by what a sync compares: where it comes from.
+type LockedEntry struct {
+	Key      string `json:"key"`
+	Type     string `json:"type"`
+	Provider string `json:"provider,omitempty"`
+	Project  string `json:"project,omitempty"`
+}
+
+// Changes are what one sync brought that the player should see before playing it: mods and packs
+// it adds, files no provider published, and entries now locked from another project.
+type Changes struct {
+	At          string    `json:"at"`
+	Added       []Changed `json:"added"`
+	Unpublished []Changed `json:"unpublished"`
+	Moved       []Changed `json:"moved"`
+}
+
+// IsEmpty reports whether c brought nothing to show.
+func (c *Changes) IsEmpty() bool {
+	return c == nil || len(c.Added)+len(c.Unpublished)+len(c.Moved) == 0
+}
+
+// Changed is one change a sync brought: a lock entry by key, or a file an override folder lays by
+// path.
+type Changed struct {
+	Key      string `json:"key,omitempty"`
+	Type     string `json:"type,omitempty"`
+	Path     string `json:"path,omitempty"`
+	Provider string `json:"provider,omitempty"`
+	Project  string `json:"project,omitempty"`
+	// WasProvider and WasProject are where a moved entry was locked from before.
+	WasProvider string `json:"wasProvider,omitempty"`
+	WasProject  string `json:"wasProject,omitempty"`
 }
 
 // Takedowns is when a sync last asked the providers about a directory's locked files, and the

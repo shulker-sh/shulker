@@ -123,6 +123,51 @@
           }
         }
       }
+    },
+    "entries": {
+      "type": "array",
+      "description": "The lock entries the last build placed from, which the next sync's changes are found against.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "type"],
+        "properties": {
+          "key": { "type": "string", "description": "The entry's key." },
+          "type": { "type": "string", "description": "The entry's kind: modpack, mod or a pack kind." },
+          "provider": { "type": "string", "description": "The provider it is locked from; absent for a file no provider published." },
+          "project": { "type": "string", "description": "The provider project it is locked from." }
+        }
+      }
+    },
+    "changelog": {
+      "type": "array",
+      "description": "What each sync of the last 30 days brought, oldest first, which the marker lists.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["at", "added", "unpublished", "moved"],
+        "properties": {
+          "at": { "type": "string", "description": "When the sync ran." },
+          "added": { "type": "array", "description": "Mods and packs from a provider the sync added.", "items": { "$ref": "#/$defs/changed" } },
+          "unpublished": { "type": "array", "description": "Lock entries no provider published, and jars and packs from override folders, the sync added.", "items": { "$ref": "#/$defs/changed" } },
+          "moved": { "type": "array", "description": "Entries the sync locked from another provider project than before.", "items": { "$ref": "#/$defs/changed" } }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "changed": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "key": { "type": "string", "description": "The lock entry's key." },
+        "type": { "type": "string", "description": "The entry's kind." },
+        "path": { "type": "string", "description": "The path an override folder lays the file at." },
+        "provider": { "type": "string", "description": "The provider the entry is locked from." },
+        "project": { "type": "string", "description": "The provider project the entry is locked from." },
+        "wasProvider": { "type": "string", "description": "The provider a moved entry was locked from before." },
+        "wasProject": { "type": "string", "description": "The project a moved entry was locked from before." }
+      }
     }
   }
 }
