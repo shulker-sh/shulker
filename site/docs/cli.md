@@ -12,7 +12,7 @@ outline: [2, 3]
 | [`shulker add <mod>...`](#shulker-add) | Add mods or modpacks to the manifest and lock |
 | [`shulker search [words...]`](#shulker-search) | Search the providers for projects to add |
 | [`shulker remove <mod>...`](#shulker-remove) | Remove mods or modpacks from the manifest and prune what only they provided |
-| [`shulker lock`](#shulker-lock) | Bring the lock in line with shulker.json without upgrading |
+| [`shulker lock [key...]`](#shulker-lock) | Bring the lock in line with shulker.json without upgrading, or look entries up again at their locked version |
 | [`shulker check [lock\|files\|deps\|server]...`](#shulker-check) | Fail when the lock is stale, a locked file can't be fetched, or a mod's dependencies aren't met |
 | [`shulker match [file...]`](#shulker-match) | Lock override jars and packs that Modrinth or CurseForge host |
 | [`shulker update [mod...]`](#shulker-update) | Update mods to the newest compatible version |
@@ -376,8 +376,11 @@ Bring `shulker.lock` in line with `shulker.json` after you edit it by hand, with
 
 `add`, `remove`, `update`, `pin`, `unpin`, `modpack add`, and `modpack remove` do the same before their own change, so a hand edit is never left out of the lock. What they bring in shows up in their output.
 
+With keys, `lock` also looks each named entry up again from its provider at the version it is locked at, and rewrites the file the lock names for it: its URL, hashes, size and filename. Its dependencies, side and channel stay as locked, and every other entry is left alone. This is how a lock whose file doesn't match its provider is put right without moving it to a newer version the way `update` does. A hosted modpack is locked again at its version, as `pin` does, with its pin in `shulker.json` left as it was: its archive is fetched again and the mods it brings are laid again. A version the provider no longer has fails with `version-not-found`; run `update <key>` to move to one it still has. A local file, or a modpack from a git, URL or folder source, has no provider version to look up and fails with `local-file` or `not-on-provider`. An entry a modpack brings fails with `modpack-provided`, since the modpack would lay it again.
+
 ```sh
 shulker lock
+shulker lock sodium
 ```
 
 ### `shulker check`
@@ -2030,7 +2033,7 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `loader-profile-invalid` | The loader profile shulker fetched isn't a version JSON with an id, so it can't be installed into the launcher. A row says what was wrong with it |
 | `loader-required` | `add` of a mod in a project without a loader, or `import` of a pack that names mods but no loader; set one with `shulker set loader.type <loader>`. On a terminal `add` asks `Which mod loader?` instead, sets `loader.type` to the answer and carries on |
 | `loader-version-unsupported` | The locked Forge version ships the legacy installer, which shulker can't run: every Forge before Minecraft 1.12.2, and 1.12.2 builds before 14.23.5.2851 |
-| `local-file` | `pin` or `unpin` named a local `file` entry, which has no provider version to pin |
+| `local-file` | `pin`, `unpin` or `lock <key>` named a local `file` entry, which has no provider version to pin or look up |
 | `local-file-missing` | A local `file` entry's file is gone and the cache has no copy of the bytes it was locked at, at `lock`, `sync` or any command that relocks; put the file back or remove the entry. A modpack's `file` entry resolves in the modpack's own directory, so one its author never committed fails the same way, and a modpack archive that is gone fails the same way too. While the cache still has them, a gone file only warns and builds from the cache |
 | `local-invalid` | `shulker.local.json` isn't valid JSON, or names a `$schema` this shulker doesn't know or names none. It never fails a command: the file is moved aside to `shulker.local.json.replaced` with a warning, and the manifest's feature defaults apply |
 | `lock-invalid` | `shulker.lock` isn't valid JSON (the message names the line and column), names a `$schema` this shulker doesn't know or names none, or doesn't match its schema (one line per failing field, by dotted path), or a change would make it invalid. `shulker lock` replaces it, keeping the old file as `shulker.lock.replaced`. `items`: the failing fields when there are several |
@@ -2060,7 +2063,7 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `modpack-offline` | A modpack archive that lists its files by provider ID, like a CurseForge zip, was read without the network. An ID carries no hash, so no cached copy can stand in; the provider's row, when there is one, is the network error |
 | `modpack-path` | A modpack's `path` is set on a source that isn't git |
 | `modpack-platform` | Locked modpacks disagree about Minecraft or the loader, and `shulker.json` sets neither; set `minecraft`/`loader`, or unlock one |
-| `modpack-provided` | The mod comes from a modpack, so it can't be removed on its own |
+| `modpack-provided` | The mod comes from a modpack, so it can't be removed on its own, or looked up again with `lock <key>`: lock a hosted modpack again with `lock <modpack>`, and a git, URL or folder modpack's author has to fix its lock |
 | `modpack-ref` | A modpack's `ref` doesn't apply to its source, or wasn't found |
 | `modpack-unlocked` | A modpack has no commit, archive hash or version in the lock; run `shulker update`, or `shulker lock` before pinning a hosted one |
 | `modpack-url-file` | A modpack fetched from a URL has a local `file` entry; a bare manifest carries no files, so serve the modpack from git or a directory |
@@ -2080,6 +2083,7 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `not-ignored` | The pair has no ignore in `shulker.json`. `candidates`: the pairs that do |
 | `not-in-place` | The project has no side that builds in place, so it keeps no history |
 | `not-installed` | A file isn't in the cache; run `shulker install` |
+| `not-on-provider` | `lock <key>` named a modpack from a git, URL or folder source, which has no provider version to look up |
 | `not-pinned` | The mod has no pin |
 | `not-shulker` | The instance belongs to another launcher, which starts it itself |
 | `not-synced` | The directory has no record of the source it was synced from |
@@ -2150,7 +2154,7 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `usage` | An unknown command or flag, wrong arguments, or a flag value that isn't allowed. The human error folds the command's usage line and its `--help` into its tree as `usage:` and `help:` rows. `items`: the missing or unexpected arguments, when that's the problem. Exits 2 |
 | `validation-failed` | The locked mods have dependency problems, checked for each side against the mods its build places; each prints the `shulker ignore` command that would accept it, and a problem only some sides have names them. `items`: the problems |
 | `version-no-file` | The provider's version has no file shulker can download, or no hash to check it against |
-| `version-not-found` | The provider has no version with the id given to `add --pin` or `pin`, or the one a Modrinth or CurseForge URL names, or no file with an id a CurseForge modpack names; for a pin its help links the project's versions page |
+| `version-not-found` | The provider has no version with the id given to `add --pin` or `pin`, or the one a Modrinth or CurseForge URL names, or no file with an id a CurseForge modpack names; for a pin its help links the project's versions page. At `lock <key>`, the provider no longer has the locked version, and its help says to run `update <key>` |
 | `version-required` | `export mrpack` and `export curseforge` need a version |
 | `world-in-use` | `restore` would replace a world a running game or server has open. `items`: the open worlds |
 | `world-not-found` | `backup --world` named a world the target doesn't hold, `restore --world` one the zip doesn't hold, or `restore` into a server was given a zip without the world its `level-name` names and no `--as`; the message names the `level-name` |

@@ -116,7 +116,7 @@ func TestHelpFor(t *testing.T) {
 	if !ok || len(add.Description) != 2 || !strings.HasPrefix(add.Description[0], "Add mods to the manifest") || len(add.Examples) != 8 || add.Examples[0] != "shulker add sodium lithium" || !add.HasMore || add.Anchor != "shulker-add" {
 		t.Fatalf("add %+v", add)
 	}
-	if lock, _ := HelpFor("shulker lock"); len(lock.Description) != 2 {
+	if lock, _ := HelpFor("shulker lock"); len(lock.Description) != 3 {
 		t.Errorf("lock description %q", lock.Description)
 	}
 	if check, _ := HelpFor("shulker check"); !slices.ContainsFunc(check.Description, func(p string) bool { return strings.HasPrefix(p, "- `deps`") }) {
