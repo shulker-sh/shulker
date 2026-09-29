@@ -48,7 +48,7 @@ func (a *app) auditCmd() *cobra.Command {
 		},
 	}
 	a.scopeFlags(cmd)
-	cmd.AddCommand(a.auditJarCmd(), a.auditFileCmd())
+	cmd.AddCommand(a.auditJarCmd(), a.auditFileCmd(), a.auditClassCmd(), a.auditGrepCmd())
 	return cmd
 }
 

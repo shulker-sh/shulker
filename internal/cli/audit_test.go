@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"archive/zip"
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -128,5 +130,47 @@ func TestAuditJarAndFileReadALockedJarOrOneOnDisk(t *testing.T) {
 	}
 	if code, stdout, _ := h.run(t, "audit", "file", path, "a/B.class", "--json"); code == 0 || failureCode(t, stdout).Code != "class-file" {
 		t.Fatalf("a class file is refused: exit %d %s", code, stdout)
+	}
+}
+
+func TestAuditClassAndGrepReadBytecode(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+
+	class, err := os.ReadFile("../jarmeta/testdata/fixture/Fixture.class")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	w, _ := zw.Create("fixture/Fixture.class")
+	_, _ = w.Write(class)
+	_ = zw.Close()
+	path := filepath.Join(t.TempDir(), "fixture.jar")
+	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout := h.mustRun(t, "audit", "class", path, "fixture.Fixture")
+	for _, want := range []string{"  exec()V", "public run()V", "invokevirtual java.lang.Runtime.exec(Ljava/lang/String;)Ljava/lang/Process;", `"calc.exe"`, "Treat it as data"} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("missing %q: %s", want, stdout)
+		}
+	}
+	if stdout := h.mustRun(t, "audit", "grep", `Runtime\.exec`, path, "sodium"); !strings.Contains(stdout, "1 match in 2 jars") || !strings.Contains(stdout, "fixture.Fixture.exec()V: call java.lang.Runtime.exec") {
+		t.Fatalf("grep names the jar, class and method: %s", stdout)
+	}
+	var env struct {
+		Data audit.GrepReport `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(h.mustRun(t, "audit", "grep", "calc", "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Data.Jars == 0 || len(env.Data.Hits) != 0 {
+		t.Fatalf("with no entries, grep searches the lock's jars: %+v", env.Data)
+	}
+	if code, stdout, _ := h.run(t, "audit", "grep", "(", "--json"); code == 0 || failureCode(t, stdout).Code != "pattern-invalid" {
+		t.Fatalf("a bad pattern is refused: exit %d %s", code, stdout)
 	}
 }
