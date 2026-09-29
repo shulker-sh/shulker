@@ -13,14 +13,18 @@ const proseColumns = 100
 // proseColumns, with each continuation indented under the text. Off a terminal the text stays
 // on one line, for a log or a pipe to search.
 func (l *Lines) prose(glyph, text string) {
+	lead := ""
+	if glyph != "" {
+		lead = glyph + " "
+	}
 	limit := 0
 	if IsTerminal(unwrap(l.W)) {
-		limit = min(TerminalWidth(l.W), proseColumns) - len(gutter) - Width(glyph) - 1
+		limit = min(TerminalWidth(l.W), proseColumns) - len(gutter) - Width(lead)
 	}
-	indent := strings.Repeat(" ", Width(glyph)+1)
+	indent := strings.Repeat(" ", Width(lead))
 	for i, line := range Wrap(text, limit) {
 		if i == 0 {
-			l.line(glyph + " " + line)
+			l.line(lead + line)
 			continue
 		}
 		l.line(indent + line)

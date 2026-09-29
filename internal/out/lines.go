@@ -230,6 +230,12 @@ func (l *Lines) Info(text string) {
 	l.prose(l.T.paint("i", sgrCyan, sgrBold), l.T.Markup(text))
 }
 
+// Paragraph is a sentence or more of prose, wrapped as an info line is but with no glyph.
+func (l *Lines) Paragraph(text string) { l.prose("", l.T.Markup(text)) }
+
+// Bullet is a paragraph in a list: a grey dot, then the text wrapped beneath itself.
+func (l *Lines) Bullet(text string) { l.prose(l.T.Grey(l.T.GlyphDot()), l.T.Markup(text)) }
+
 // Muted is a whole line in grey, for progress notes that carry no result.
 func (l *Lines) Muted(text string) { l.line(l.T.Grey(text)) }
 

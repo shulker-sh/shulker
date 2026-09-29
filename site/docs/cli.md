@@ -86,6 +86,7 @@ outline: [2, 3]
 | [`shulker docs [topic]...`](#shulker-docs) | Print shulker's documentation |
 | [`shulker cache info`](#shulker-cache-info) | Show the cache's size and how much prune would free |
 | [`shulker cache prune`](#shulker-cache-prune) | Remove cached files no instance or project references |
+| [`shulker security`](#shulker-security) | Explain how shulker keeps bad files off your machine |
 | [`shulker log`](#shulker-log) | Show what shulker did, from its log |
 | [`shulker version`](#shulker-version) | Print the shulker version |
 | [`shulker self update`](#shulker-self-update) | Update shulker to the latest release |
@@ -1736,6 +1737,15 @@ shulker cache prune
 | --- | --- |
 | `--lock` | Also keep what this lock file references; repeat for more |
 | `--manual` | Also remove manual downloads, which nothing can fetch again |
+
+### `shulker security`
+
+Explain how shulker keeps bad files off your machine. It opens with what shulker aims for, lists what it does on every run and what each protection stops, and ends with a table of the settings that change a protection, once there are any. No project or source can turn off a protection that has no setting. Every security warning and error ends by pointing here, under `Read what shulker checks and why:`. With `--json`, `data` holds the `stance` and a `protections` row for each: its `id`, a one-sentence `summary`, whether it is `on`, and for a configurable one its `setting`, `value` and what it `changes`.
+
+```sh
+shulker security
+shulker security --json
+```
 
 ### `shulker log`
 
