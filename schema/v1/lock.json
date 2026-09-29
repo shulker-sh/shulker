@@ -144,6 +144,7 @@
         "project": { "$ref": "#/$defs/providerId", "description": "Provider project id. Hosted modpacks only." },
         "version": { "$ref": "#/$defs/providerId", "description": "Provider version id (Modrinth) or file id (CurseForge). Hosted modpacks only." },
         "versionNumber": { "type": "string", "minLength": 1, "description": "Provider display string. Never parsed. Hosted modpacks only." },
+        "published": { "type": "string", "format": "date-time", "description": "When the provider published the version, which security.minReleaseAge is measured from." },
         "channel": { "type": "string", "enum": ["release", "beta", "alpha"], "description": "Least stable channel accepted when this version was picked. Hosted modpacks only." },
         "url": {
           "type": ["string", "null"],
@@ -192,7 +193,7 @@
             "else": { "not": { "required": ["page"] } }
           },
           "else": {
-            "not": { "anyOf": [{ "required": ["project"] }, { "required": ["version"] }, { "required": ["versionNumber"] }, { "required": ["channel"] }, { "required": ["url"] }, { "required": ["page"] }, { "required": ["filename"] }] }
+            "not": { "anyOf": [{ "required": ["project"] }, { "required": ["version"] }, { "required": ["versionNumber"] }, { "required": ["published"] }, { "required": ["channel"] }, { "required": ["url"] }, { "required": ["page"] }, { "required": ["filename"] }] }
           }
         },
         {
@@ -217,6 +218,7 @@
         "project": { "$ref": "#/$defs/providerId", "description": "Provider project id." },
         "version": { "$ref": "#/$defs/providerId", "description": "Provider version id (Modrinth) or file id (CurseForge)." },
         "versionNumber": { "type": "string", "minLength": 1, "description": "Provider display string. Never parsed." },
+        "published": { "type": "string", "format": "date-time", "description": "When the provider published the version, which security.minReleaseAge is measured from." },
         "filename": { "type": "string", "minLength": 1, "pattern": "^[^/\\\\]+\\.jar$" },
         "url": {
           "type": ["string", "null"],
@@ -255,7 +257,7 @@
           "if": { "required": ["file"] },
           "then": {
             "required": ["size"],
-            "not": { "anyOf": [{ "required": ["provider"] }, { "required": ["project"] }, { "required": ["version"] }, { "required": ["versionNumber"] }, { "required": ["url"] }, { "required": ["page"] }, { "required": ["channel"] }] }
+            "not": { "anyOf": [{ "required": ["provider"] }, { "required": ["project"] }, { "required": ["version"] }, { "required": ["versionNumber"] }, { "required": ["published"] }, { "required": ["url"] }, { "required": ["page"] }, { "required": ["channel"] }] }
           },
           "else": {
             "required": ["provider", "project", "version", "versionNumber", "url", "channel"],
@@ -276,6 +278,7 @@
         "project": { "$ref": "#/$defs/providerId", "description": "Provider project id." },
         "version": { "$ref": "#/$defs/providerId", "description": "Provider version id (Modrinth) or file id (CurseForge)." },
         "versionNumber": { "type": "string", "minLength": 1, "description": "Provider display string. Never parsed." },
+        "published": { "type": "string", "format": "date-time", "description": "When the provider published the version, which security.minReleaseAge is measured from." },
         "filename": {
           "type": "string",
           "minLength": 1,
@@ -317,7 +320,7 @@
           "if": { "required": ["file"] },
           "then": {
             "required": ["size"],
-            "not": { "anyOf": [{ "required": ["provider"] }, { "required": ["project"] }, { "required": ["version"] }, { "required": ["versionNumber"] }, { "required": ["url"] }, { "required": ["page"] }, { "required": ["channel"] }, { "required": ["sha1"] }] }
+            "not": { "anyOf": [{ "required": ["provider"] }, { "required": ["project"] }, { "required": ["version"] }, { "required": ["versionNumber"] }, { "required": ["published"] }, { "required": ["url"] }, { "required": ["page"] }, { "required": ["channel"] }, { "required": ["sha1"] }] }
           },
           "else": {
             "required": ["provider", "project", "version", "versionNumber", "url", "sha1", "channel"],

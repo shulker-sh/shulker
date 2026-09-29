@@ -9,6 +9,7 @@ import (
 	"os"
 	"slices"
 	"sort"
+	"time"
 
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/integrations"
@@ -72,23 +73,25 @@ type Java struct {
 // Modpack is where a modpack resolved to: a source's commit or digest, a local archive's bytes, or
 // a provider version and its archive's bytes.
 type Modpack struct {
-	Provider      string  `json:"provider,omitempty"`
-	Project       string  `json:"project,omitempty"`
-	Version       string  `json:"version,omitempty"`
-	VersionNumber string  `json:"versionNumber,omitempty"`
-	Channel       string  `json:"channel,omitempty"`
-	URL           *string `json:"url,omitempty"`
-	Page          string  `json:"page,omitempty"`
-	Filename      string  `json:"filename,omitempty"`
-	Source        string  `json:"source,omitempty"`
-	Ref           string  `json:"ref,omitempty"`
-	Path          string  `json:"path,omitempty"`
-	Commit        string  `json:"commit,omitempty"`
-	DirSha256     string  `json:"dirSha256,omitempty"`
-	Sha256        string  `json:"sha256,omitempty"`
-	File          string  `json:"file,omitempty"`
-	Sha512        string  `json:"sha512,omitempty"`
-	Size          int64   `json:"size,omitempty"`
+	Provider      string `json:"provider,omitempty"`
+	Project       string `json:"project,omitempty"`
+	Version       string `json:"version,omitempty"`
+	VersionNumber string `json:"versionNumber,omitempty"`
+	// Published is when the provider published Version.
+	Published time.Time `json:"published,omitzero"`
+	Channel   string    `json:"channel,omitempty"`
+	URL       *string   `json:"url,omitempty"`
+	Page      string    `json:"page,omitempty"`
+	Filename  string    `json:"filename,omitempty"`
+	Source    string    `json:"source,omitempty"`
+	Ref       string    `json:"ref,omitempty"`
+	Path      string    `json:"path,omitempty"`
+	Commit    string    `json:"commit,omitempty"`
+	DirSha256 string    `json:"dirSha256,omitempty"`
+	Sha256    string    `json:"sha256,omitempty"`
+	File      string    `json:"file,omitempty"`
+	Sha512    string    `json:"sha512,omitempty"`
+	Size      int64     `json:"size,omitempty"`
 	// Unmanaged is what an archive lays as its own override files, by layer and path, each with
 	// its sha512: the files no lock entry took.
 	Unmanaged map[string]string `json:"unmanaged,omitempty"`
@@ -118,15 +121,17 @@ func (p Modpack) Label() string {
 // Mod is a locked mod jar. One with File is a local file: it names no provider, so every
 // provider-shaped field stays empty and url is left out rather than written null.
 type Mod struct {
-	File          string  `json:"file,omitempty"`
-	Provider      string  `json:"provider,omitempty"`
-	Project       string  `json:"project,omitempty"`
-	Version       string  `json:"version,omitempty"`
-	VersionNumber string  `json:"versionNumber,omitempty"`
-	Filename      string  `json:"filename"`
-	URL           *string `json:"url"`
-	Page          string  `json:"page,omitempty"`
-	Sha512        string  `json:"sha512"`
+	File          string `json:"file,omitempty"`
+	Provider      string `json:"provider,omitempty"`
+	Project       string `json:"project,omitempty"`
+	Version       string `json:"version,omitempty"`
+	VersionNumber string `json:"versionNumber,omitempty"`
+	// Published is when the provider published Version.
+	Published time.Time `json:"published,omitzero"`
+	Filename  string    `json:"filename"`
+	URL       *string   `json:"url"`
+	Page      string    `json:"page,omitempty"`
+	Sha512    string    `json:"sha512"`
 	// Sha1 is the provider's sha1 of a file the lock holds without its bytes: one a manual
 	// download was skipped for, which the file dropped into downloads/ is matched by.
 	Sha1       string   `json:"sha1,omitempty"`
@@ -163,6 +168,8 @@ type Pack struct {
 	Project       string `json:"project,omitempty"`
 	Version       string `json:"version,omitempty"`
 	VersionNumber string `json:"versionNumber,omitempty"`
+	// Published is when the provider published Version.
+	Published time.Time `json:"published,omitzero"`
 	// Filename is where the build places the pack; ProviderFilename is the
 	// provider's own name for it.
 	Filename         string  `json:"filename"`

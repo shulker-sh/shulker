@@ -735,6 +735,7 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 		Project:       proj.ID,
 		Version:       v.ID,
 		VersionNumber: versionNumber(p, v.Number, info),
+		Published:     v.Published,
 		Filename:      v.File.Filename,
 		URL:           got.url,
 		Page:          got.page,

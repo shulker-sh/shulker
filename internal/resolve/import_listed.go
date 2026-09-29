@@ -208,7 +208,7 @@ func (im *importer) lockPending(p provider.Provider, proj *provider.Project, v *
 	}
 	side := cmp.Or(f.Side, proj.Side, "both")
 	channel := shippedChannel(v)
-	im.r.Lock.Mods[key] = lock.Mod{Provider: p.Name(), Project: proj.ID, Version: v.ID, VersionNumber: v.Number, Filename: v.File.Filename, Page: v.Page, Sha1: v.File.Sha1, Size: v.File.Size, Side: side, SideFrom: sideFromProvider, Channel: channelLabel(channel), RequiredBy: []string{}}
+	im.r.Lock.Mods[key] = lock.Mod{Provider: p.Name(), Project: proj.ID, Version: v.ID, VersionNumber: v.Number, Published: v.Published, Filename: v.File.Filename, Page: v.Page, Sha1: v.File.Sha1, Size: v.File.Size, Side: side, SideFrom: sideFromProvider, Channel: channelLabel(channel), RequiredBy: []string{}}
 	entry := manifest.Require{Channel: channel}
 	im.r.setSource(&entry, key, p, proj)
 	im.r.Manifest.Requires[key] = entry

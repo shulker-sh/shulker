@@ -257,6 +257,7 @@ func (r *Resolver) lockPackVersion(ctx context.Context, p provider.Provider, pro
 		Project:          proj.ID,
 		Version:          v.ID,
 		VersionNumber:    v.Number,
+		Published:        v.Published,
 		Filename:         manifest.PackFilename(key, r.Manifest.Requires[key]),
 		ProviderFilename: v.File.Filename,
 		URL:              got.url,

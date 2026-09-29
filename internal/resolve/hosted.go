@@ -156,6 +156,7 @@ func (r *Resolver) obtainModpack(ctx context.Context, name string, entry manifes
 		Project:       proj.ID,
 		Version:       v.ID,
 		VersionNumber: v.Number,
+		Published:     v.Published,
 		Channel:       channelLabel(channel),
 		URL:           got.url,
 		Page:          got.page,
