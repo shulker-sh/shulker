@@ -105,32 +105,9 @@ func readClass(data []byte) (classDeclarations, error) {
 		return d, errors.New("not a class file")
 	}
 	r.take(4)
-	pool := make(constantPool, r.u2())
-	for i := 1; i < len(pool) && r.err == nil; i++ {
-		pool[i].tag = r.u1()
-		switch pool[i].tag {
-		case 1:
-			pool[i].text = string(r.take(r.u2()))
-		case 3:
-			pool[i].number = int(int32(r.u4()))
-		case 4:
-			r.take(4)
-		case 5, 6:
-			r.take(8)
-			i++
-		case 7, 8:
-			pool[i].ref[0] = r.u2()
-		case 16, 19, 20:
-			r.take(2)
-		case 9, 10, 11, 12:
-			pool[i].ref = [2]int{r.u2(), r.u2()}
-		case 17, 18:
-			r.take(4)
-		case 15:
-			r.take(3)
-		default:
-			return d, errors.New("unknown constant pool tag")
-		}
+	pool, err := readPool(r)
+	if err != nil {
+		return d, err
 	}
 	r.take(4)
 	super := pool.text(pool.at(r.u2()).ref[0])
@@ -175,6 +152,35 @@ func readClass(data []byte) (classDeclarations, error) {
 		}
 	}
 	return d, r.err
+}
+
+// readPool reads a class file's constant pool, keeping text, ints, and the indexes each reference
+// points through.
+func readPool(r *classReader) (constantPool, error) {
+	pool := make(constantPool, r.u2())
+	for i := 1; i < len(pool) && r.err == nil; i++ {
+		pool[i].tag = r.u1()
+		switch pool[i].tag {
+		case 1:
+			pool[i].text = string(r.take(r.u2()))
+		case 3:
+			pool[i].number = int(int32(r.u4()))
+		case 4:
+			r.take(4)
+		case 5, 6:
+			r.take(8)
+			i++
+		case 7, 8, 16, 19, 20:
+			pool[i].ref[0] = r.u2()
+		case 9, 10, 11, 12, 17, 18:
+			pool[i].ref = [2]int{r.u2(), r.u2()}
+		case 15:
+			r.take(3)
+		default:
+			return nil, errors.New("unknown constant pool tag")
+		}
+	}
+	return pool, r.err
 }
 
 func mentionsFML(data []byte) bool {
