@@ -25,6 +25,8 @@ type Env struct {
 	CurseForge *Host
 	Logged     []string
 	Warnings   []string
+	// Security are the warnings raised through WarnSecurity, also in Warnings as their messages.
+	Security []out.SecurityWarning
 }
 
 // New is an env on a temp cache, a CDN with modrinth and curseforge hosts publishing to it, a
@@ -55,6 +57,10 @@ func New(t *testing.T) *Env {
 		Warn:      func(format string, args ...any) { e.Warnings = append(e.Warnings, fmt.Sprintf(format, args...)) },
 		WarnNudge: func(n out.Nudge, format string, args ...any) {
 			e.Warnings = append(e.Warnings, fmt.Sprintf(format, args...))
+		},
+		WarnSecurity: func(w out.SecurityWarning) {
+			e.Warnings = append(e.Warnings, w.Message)
+			e.Security = append(e.Security, w)
 		},
 	}
 	FakeLoaders(t, e.CDN)

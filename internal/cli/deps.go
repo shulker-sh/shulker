@@ -103,6 +103,7 @@ func (a *app) newDeps(e *env.Env) *deps {
 	e.Progress = a.printer.Progress
 	e.Warn = a.printer.Warn
 	e.WarnNudge = a.printer.WarnNudge
+	e.WarnSecurity = a.printer.WarnSecurity
 	e.WarnsRawURL = a.warnsRawURL
 	return &deps{Env: e, meta: &resolve.Meta{Piston: e.Piston, Loaders: e.Loaders}}
 }

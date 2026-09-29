@@ -113,7 +113,7 @@ func Run(ctx context.Context, e *Env, src *Source, req Request) (res Result, err
 	}
 	e.WarnEach(rep.Warnings)
 	for _, w := range rep.SecurityWarnings() {
-		e.WarnNudge(security.Nudge, "%s", w)
+		e.WarnSecurity(security.Warn(security.CacheHash, w, nil))
 	}
 	if side == "client" {
 		e.syncLauncherImage(into, b)

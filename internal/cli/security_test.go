@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -75,5 +76,15 @@ func TestAChangedCacheObjectWarnsWithThePointer(t *testing.T) {
 	_, _, stderr := h.run(t, "build")
 	if !strings.Contains(stderr, "held a changed copy of") || !strings.Contains(stderr, "Read what shulker checks and why:\n    $ shulker security\n") {
 		t.Fatalf("stderr: %q", stderr)
+	}
+	if err := os.WriteFile(c.Object(h.readLock(t).Mods["sodium"].Sha512), []byte("infected"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(filepath.Join(h.dir, "build")); err != nil {
+		t.Fatal(err)
+	}
+	env := h.runEnvelope(t, 0, "build")
+	if len(env.SecurityWarnings) != 1 || env.SecurityWarnings[0].Protection != "cache-hash" || !slices.Contains(env.Warnings, env.SecurityWarnings[0].Message) {
+		t.Fatalf("security warnings: %+v, warnings: %q", env.SecurityWarnings, env.Warnings)
 	}
 }

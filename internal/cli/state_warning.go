@@ -39,7 +39,7 @@ func (a *app) warnBuild(side string, several bool, warnings, securityWarnings []
 	}
 	a.warn(warnings)
 	for _, w := range securityWarnings {
-		a.printer.WarnNudge(security.Nudge, "%s", w)
+		a.printer.WarnSecurity(security.Warn(security.CacheHash, w, nil))
 	}
 	a.warnState(state, force)
 }

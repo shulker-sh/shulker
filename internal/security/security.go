@@ -37,6 +37,12 @@ func Refusal(id ID, e *out.Error) *out.Error {
 	return e
 }
 
+// Warn is a warning from protection id: its message, its facts for --json, and nudges, which end
+// with Nudge.
+func Warn(id ID, message string, data any, nudges ...out.Nudge) out.SecurityWarning {
+	return out.SecurityWarning{Protection: string(id), Message: message, Data: data, Nudges: append(nudges, Nudge)}
+}
+
 // Protection is one thing shulker does to keep a bad file off the player's machine.
 type Protection struct {
 	ID ID `json:"id"`

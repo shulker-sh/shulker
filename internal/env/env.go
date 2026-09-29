@@ -46,6 +46,8 @@ type Env struct {
 	Warn func(format string, args ...any)
 	// WarnNudge is Warn with the command that deals with the warning beneath it.
 	WarnNudge func(n out.Nudge, format string, args ...any)
+	// WarnSecurity reports a warning one of shulker's protections raised.
+	WarnSecurity func(w out.SecurityWarning)
 	// WarnsRawURL is set for a command that adds or links a source, which warns that a raw
 	// manifest URL brings no overrides.
 	WarnsRawURL bool

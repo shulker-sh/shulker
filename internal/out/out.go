@@ -28,8 +28,20 @@ type Envelope struct {
 	Command   string   `json:"command"`
 	LockStale bool     `json:"lockStale"`
 	Warnings  []string `json:"warnings"`
-	Data      any      `json:"data,omitempty"`
-	Error     *Error   `json:"error,omitempty"`
+	// SecurityWarnings are the warnings a protection raised, each also in Warnings as its message.
+	SecurityWarnings []SecurityWarning `json:"securityWarnings"`
+	Data             any               `json:"data,omitempty"`
+	Error            *Error            `json:"error,omitempty"`
+}
+
+// SecurityWarning is a warning about what one of shulker's protections caught, typed under --json:
+// the protection's id in `shulker security --json`, the message as Warnings has it, and its facts.
+type SecurityWarning struct {
+	Protection string `json:"protection"`
+	Message    string `json:"message"`
+	Data       any    `json:"data,omitempty"`
+	// Nudges print beneath the warning, in order.
+	Nudges []Nudge `json:"-"`
 }
 
 // Error is a failure the user sees. Code is its stable name, matched by code and never by message.
@@ -205,6 +217,7 @@ type Printer struct {
 	ClearFetches bool
 	frame        frame
 	warnings     []string
+	security     []SecurityWarning
 	// printed is whether stdout already holds the run's output: an envelope, or what a Raw command
 	// wrote itself.
 	printed  bool
@@ -230,6 +243,24 @@ func (p *Printer) WarnNudge(n Nudge, format string, args ...any) {
 		l.Nudge(n.Lead, n.Command)
 		l.Blank()
 	}
+}
+
+// WarnSecurity is a protection's warning: a warning like any other, with w's nudges beneath it, and
+// its own typed entry under --json.
+func (p *Printer) WarnSecurity(w SecurityWarning) {
+	if !p.warn("%s", w.Message) {
+		return
+	}
+	w.Message = p.WarnPrefix + w.Message
+	p.security = append(p.security, w)
+	if p.JSON {
+		return
+	}
+	l := p.Err()
+	for _, n := range w.Nudges {
+		l.Nudge(n.Lead, n.Command)
+	}
+	l.Blank()
 }
 
 // warn reports whether the warning was new; a repeat is dropped. Each line after a warning's first
@@ -271,7 +302,11 @@ func (p *Printer) envelope(ok bool, data any, e *Error) Envelope {
 	if warnings == nil {
 		warnings = []string{}
 	}
-	return Envelope{OK: ok, Command: p.Command, LockStale: p.LockStale, Warnings: warnings, Data: data, Error: e}
+	security := p.security
+	if security == nil {
+		security = []SecurityWarning{}
+	}
+	return Envelope{OK: ok, Command: p.Command, LockStale: p.LockStale, Warnings: warnings, SecurityWarnings: security, Data: data, Error: e}
 }
 
 // Emit prints a command's result: data as the JSON envelope under --json, otherwise whatever human

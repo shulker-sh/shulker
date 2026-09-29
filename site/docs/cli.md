@@ -1883,6 +1883,7 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
   "command": "modpack add",
   "lockStale": false,
   "warnings": [],
+  "securityWarnings": [],
   "data": {}
 }
 ```
@@ -1893,6 +1894,7 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 | `command` | The command that ran, like `modpack add` |
 | `lockStale` | `shulker.lock` doesn't match `shulker.json`; `shulker lock` brings it in line. Commands that build from the lock warn, naming each difference, and carry on; `export` refuses |
 | `warnings` | Everything shulker would print as a `!` line without `--json`. Always present, empty when there are none |
+| `securityWarnings` | The warnings a security protection raised, each also in `warnings` as its message: `protection`, the `id` of its row in [`shulker security --json`](#shulker-security), `message`, and `data` with its facts where it has any, like the versions [`security.minReleaseAge`](#configuration) held back. Always present, empty when there are none |
 | `data` | The command's result, left out when it has none. When a command that works through several entries fails, like `sync --all`, it holds the result for each entry |
 | `error` | Present when `ok` is `false`: `code`, `message`, and sometimes `help`, `candidates`, `items` or `protection` |
 
