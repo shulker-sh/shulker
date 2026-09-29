@@ -13,6 +13,7 @@ import (
 
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -43,12 +44,36 @@ func TestDownloadFailure(t *testing.T) {
 	}
 }
 
+func TestAGroupCountsWhatItHolds(t *testing.T) {
+	for _, c := range []struct {
+		fetches []groupFetch
+		want    string
+	}{
+		{[]groupFetch{fetchAt("mods/a.jar"), fetchAt("mods/b.jar")}, "Fetched 2 mods"},
+		{[]groupFetch{fetchAt("resourcepacks/a.zip"), fetchAt("resourcepacks/b.zip")}, "Fetched 2 resource packs"},
+		{[]groupFetch{fetchAt("mods/a.jar"), fetchAt("shaderpacks/b.zip")}, "Fetched 2 files"},
+		{[]groupFetch{fetchAt("config/a.toml"), fetchAt("config/b.toml")}, "Fetched 2 files"},
+		{[]groupFetch{{name: "a.jar", kind: manifest.TypeMod}, {name: "b.jar", kind: manifest.TypeMod}}, "Fetched 2 mods"},
+	} {
+		var stderr bytes.Buffer
+		p := &out.Printer{Stdout: &bytes.Buffer{}, Stderr: &stderr}
+		r := &Resolver{Progress: p.Progress, Note: p.Note, Log: func(string, ...any) {}}
+		end := r.startGroup(c.fetches)
+		r.fetching("a", "1")
+		r.fetching("b", "1")
+		end(false)
+		if got := stderr.String(); got != "  ✔ "+c.want+"\n" {
+			t.Errorf("%v: stderr %q, want %q", c.fetches, got, c.want)
+		}
+	}
+}
+
 func TestAGroupHoldsTheStepsAndNotesItsLoopLogs(t *testing.T) {
 	var stderr bytes.Buffer
 	p := &out.Printer{Stdout: &bytes.Buffer{}, Stderr: &stderr}
 	var steps []string
 	r := &Resolver{Progress: p.Progress, Note: p.Note, Log: func(format string, args ...any) { steps = append(steps, fmt.Sprintf(format, args...)) }}
-	end := r.startGroup([]string{"mods/sodium.jar", "mods/iris.jar"})
+	end := r.startGroup([]groupFetch{fetchAt("mods/sodium.jar"), fetchAt("mods/iris.jar")})
 	r.fetching("sodium", "0.9")
 	r.log("switching iris from alpha to beta")
 	r.noteKept("iris", "shaders", lock.Mod{VersionNumber: "1.8"})

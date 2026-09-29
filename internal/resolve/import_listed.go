@@ -43,10 +43,10 @@ func (im *importer) listedByID(ctx context.Context) error {
 		var missing []string
 		var rows []out.Detail
 		var byHand []manual.File
-		var fetches []string
+		var fetches []groupFetch
 		for _, f := range byProvider[name] {
 			if !f.Optional {
-				fetches = append(fetches, f.Path)
+				fetches = append(fetches, groupFetch{name: found.versions[f.Version].File.Filename, kind: found.projects[f.Project].Type})
 			}
 		}
 		end := r.startGroup(fetches)

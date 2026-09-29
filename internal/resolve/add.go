@@ -24,6 +24,7 @@ import (
 	"shulker.sh/shulker/internal/manual"
 	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/provider"
 )
 
@@ -120,28 +121,44 @@ type AddOptions struct {
 	IsFromURL bool
 }
 
+// groupFetch is one file a group may fetch: its name, and the kind of entry it is, empty for a
+// file that is no kind shulker locks.
+type groupFetch struct {
+	name, kind string
+}
+
+// fetchAt is the file at a path in the game directory, its kind read from the folder it sits in.
+func fetchAt(p string) groupFetch {
+	f := groupFetch{name: path.Base(p)}
+	switch {
+	case strings.HasPrefix(p, "mods/"):
+		f.kind = manifest.TypeMod
+	case strings.HasPrefix(p, "resourcepacks/"):
+		f.kind = manifest.TypeResourcePack
+	case strings.HasPrefix(p, "shaderpacks/"):
+		f.kind = manifest.TypeShader
+	case packarchive.IsDatapackZip(p):
+		f.kind = manifest.TypeDatapack
+	}
+	return f
+}
+
 // startGroup puts a loop's fetches on one live line that settles into a count of them, "✔ Fetched
-// 60 mods", rather than a step each; paths are the files the loop may fetch. end settles the line,
-// or clears it for the error that follows when failed. Without a bar, as under --json, off a
-// terminal for the steps or with --verbose, each fetch keeps its own step.
-func (r *Resolver) startGroup(paths []string) (end func(failed bool)) {
-	if r.Progress == nil || r.EveryFetch || r.group != nil || len(paths) == 0 {
+// 60 mods", rather than a step each. The count names the kind every fetch shares, and files when
+// they share none. end settles the line, or clears it for the error that follows when failed.
+// Without a bar, as under --json, off a terminal for the steps or with --verbose, each fetch keeps
+// its own step.
+func (r *Resolver) startGroup(fetches []groupFetch) (end func(failed bool)) {
+	if r.Progress == nil || r.EveryFetch || r.group != nil || len(fetches) == 0 {
 		return func(bool) {}
 	}
-	mods := 0
-	downloads := make([]out.Download, len(paths))
-	for i, p := range paths {
-		downloads[i] = out.Download{Name: path.Base(p)}
-		if strings.HasPrefix(p, "mods/") || strings.Contains(p, "/mods/") {
-			mods++
-		}
+	downloads := make([]out.Download, len(fetches))
+	for i, f := range fetches {
+		downloads[i] = out.Download{Name: f.name}
 	}
-	one, many := "file", "mods and packs"
-	switch mods {
-	case len(paths):
-		one, many = "mod", "mods"
-	case 0:
-		one, many = "pack", "packs"
+	one, many := "file", "files"
+	if kind := fetches[0].kind; kind != "" && !slices.ContainsFunc(fetches, func(f groupFetch) bool { return f.kind != kind }) {
+		one, many = manifest.TypeNouns(kind)
 	}
 	g := r.Progress("fetching", downloads).Counts(one, many)
 	if g == nil {

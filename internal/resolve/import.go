@@ -524,10 +524,10 @@ func (im *importer) identify(ctx context.Context) error {
 func (im *importer) lockIdentified(ctx context.Context) (err error) {
 	queued := im.unmatched
 	im.unmatched = nil
-	var fetches []string
+	var fetches []groupFetch
 	for _, o := range queued {
 		if h, ok := im.found[o.Layer+"/"+o.Path]; ok && h.v.File.URL != "" {
-			fetches = append(fetches, o.Path)
+			fetches = append(fetches, fetchAt(o.Path))
 		}
 	}
 	end := im.r.startGroup(fetches)
