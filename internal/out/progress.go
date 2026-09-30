@@ -25,7 +25,7 @@ const (
 	widestBytes = "999.9 MB"
 )
 
-// Progress draws a download bar on a terminal and settles into one ok line.
+// Progress draws a download bar on a terminal and settles into one grey ok line, like a step.
 // Off a terminal only the final line prints; with --json nothing does.
 type Progress struct {
 	mu  sync.Mutex
@@ -181,11 +181,11 @@ func (pr *Progress) Finish() {
 	if pr.done == 1 {
 		noun = one
 	}
-	aside := ""
+	text := fmt.Sprintf("%s %d %s", Sentence(pastTense(pr.verb)), pr.done, noun)
 	if pr.bytes > 0 {
-		aside = humanBytes(pr.bytes)
+		text += " (" + humanBytes(pr.bytes) + ")"
 	}
-	pr.l.OK(fmt.Sprintf("%s %d %s", Sentence(pastTense(pr.verb)), pr.done, noun), aside)
+	pr.l.Done(text)
 }
 
 // Abort clears the bar without a summary, for the error that follows.

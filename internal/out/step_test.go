@@ -187,3 +187,18 @@ func TestPastTense(t *testing.T) {
 		}
 	}
 }
+
+func TestGroupSettlesGreyLikeAStep(t *testing.T) {
+	var stderr bytes.Buffer
+	p := &Printer{Stdout: &bytes.Buffer{}, Stderr: &stderr, ErrTheme: Theme{HasColor: true}}
+	p.Step("fetching fabric loader 0.19.5 for 26.2")
+	g := p.Progress("fetching", []Download{{Name: "sodium"}}).Counts("mod", "mods")
+	g.Bytes(3 << 20)
+	g.Advance()
+	g.Finish()
+	grey := p.ErrTheme.Grey
+	want := "  " + grey("✔ Fetched fabric loader 0.19.5 for 26.2") + "\n  " + grey("✔ Fetched 1 mod (3.0 MB)") + "\n"
+	if stderr.String() != want {
+		t.Fatalf("stderr: %q", stderr.String())
+	}
+}
