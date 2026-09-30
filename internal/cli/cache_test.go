@@ -12,6 +12,7 @@ import (
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/lock"
 )
 
 func strayObject(t *testing.T, c *cache.Cache, content string) string {
@@ -86,6 +87,29 @@ func TestCachePruneKeepsManualDownloadsUnlessAsked(t *testing.T) {
 	h.mustRun(t, "cache", "prune", "--manual")
 	if c.Has(sha) {
 		t.Fatal("prune --manual removes it")
+	}
+}
+
+func TestCachePruneManualSaysWhichManualDownloadsItKept(t *testing.T) {
+	h := newInPlace(t)
+	c := &cache.Cache{Dir: h.cache}
+	sha, err := c.PutManual(strings.NewReader("an imported pack"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	l, err := lock.Load(filepath.Join(h.dir, lock.FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	l.Imported = &lock.Imported{Sha512: sha}
+	if err := l.Save(filepath.Join(h.dir, lock.FileName)); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout := h.mustRun(t, "cache", "prune", "--manual")
+
+	if !c.Has(sha) || !strings.Contains(stdout, "Kept 1 manual download still in use; the cache is kept for the project here.") {
+		t.Fatalf("prune --manual says why the used download stayed: %s", stdout)
 	}
 }
 

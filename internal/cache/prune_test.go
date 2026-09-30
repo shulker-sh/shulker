@@ -286,3 +286,22 @@ func TestIngestPutsAFilesBytesInTheCache(t *testing.T) {
 		t.Fatalf("only the file should be an object: %+v", u)
 	}
 }
+
+func TestPruneCountsTheManualDownloadsARootStillUses(t *testing.T) {
+	c := newCache(t)
+	used, err := c.PutManual(strings.NewReader("a jar a lock still names"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.PutManual(strings.NewReader("a jar nothing names")); err != nil {
+		t.Fatal(err)
+	}
+	l := lock.New()
+	l.Imported = &lock.Imported{Sha512: used}
+
+	p, err := c.Prune([]Root{{Lock: l}}, PruneOptions{Manual: true})
+
+	if err != nil || p.Files != 1 || p.KeptManual != 1 || !c.Has(used) {
+		t.Fatalf("pruned %+v, err %v: the used manual download stays and is counted", p, err)
+	}
+}

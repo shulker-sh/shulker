@@ -35,6 +35,9 @@ type Pruned struct {
 	Temp      int   `json:"temp"`
 	Listings  int   `json:"listings"`
 	Bytes     int64 `json:"bytes"`
+	// KeptManual counts the manual downloads a prune that may remove them kept, because a root
+	// still uses them.
+	KeptManual int `json:"keptManual,omitempty"`
 }
 
 func (p Pruned) Empty() bool {
@@ -99,14 +102,20 @@ type PruneOptions struct {
 // never candidates.
 func (c *Cache) Prune(roots []Root, o PruneOptions) (Pruned, error) {
 	keep := c.keep(roots)
-	if !o.Manual {
-		manual, err := c.manualObjects()
-		if err != nil {
-			return Pruned{}, err
-		}
-		maps.Copy(keep, manual)
+	manual, err := c.manualObjects()
+	if err != nil {
+		return Pruned{}, err
 	}
 	var p Pruned
+	if o.Manual {
+		for path := range manual {
+			if keep[path] {
+				p.KeptManual++
+			}
+		}
+	} else {
+		maps.Copy(keep, manual)
+	}
 	trees := []struct {
 		dir   string
 		depth int

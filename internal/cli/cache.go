@@ -122,6 +122,9 @@ func (a *app) cachePruneCmd() *cobra.Command {
 				return err
 			}
 			return a.printer.Emit(pruned, func(l *out.Lines) {
+				if pruned.KeptManual > 0 {
+					defer l.Info("Kept " + out.Count(pruned.KeptManual, "manual download", "manual downloads") + " still in use; the cache is " + rootsText(r) + ".")
+				}
 				switch {
 				case pruned.Empty() && r.Count() == 0:
 					l.Info("Nothing to prune")
