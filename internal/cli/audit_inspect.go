@@ -83,8 +83,8 @@ func (a *app) inspectSubject(cmd *cobra.Command, arg string) (audit.Subject, pro
 // project, but take a lock entry's origin when one here locks the same bytes; nil means none.
 func (a *app) inspectBuilder(cmd *cobra.Command, args []string) (*build.Builder, error) {
 	if a.instance != "" || len(args) == 0 || slices.ContainsFunc(args, func(arg string) bool { return !audit.IsPath(arg) }) {
-		b, _, err := a.auditTarget(cmd)
-		return b, err
+		scope, err := a.auditTarget(cmd)
+		return scope.builder, err
 	}
 	p, err := a.openProject()
 	if err != nil || p.RequireLock() != nil {

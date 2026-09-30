@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -172,5 +173,26 @@ func TestAuditClassAndGrepReadBytecode(t *testing.T) {
 	}
 	if code, stdout, _ := h.run(t, "audit", "grep", "(", "--json"); code == 0 || failureCode(t, stdout).Code != "pattern-invalid" {
 		t.Fatalf("a bad pattern is refused: exit %d %s", code, stdout)
+	}
+}
+
+func TestAuditExposureMapsWhoControlsEachEntry(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	if stdout := h.mustRun(t, "audit", "exposure"); !strings.Contains(stdout, "No registered instance builds this project") || !strings.Contains(stdout, "on update") {
+		t.Fatalf("text: %s", stdout)
+	}
+	h.mustRun(t, "pin", "sodium")
+	var env struct {
+		Data audit.Exposure `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(h.mustRun(t, "audit", "exposure", "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	x := env.Data
+	i := slices.IndexFunc(x.Entries, func(e audit.Exposed) bool { return e.Key == "sodium" })
+	if i < 0 || x.Entries[i].Owner != audit.OwnerProvider || x.Entries[i].Changes != audit.Pinned || len(x.Launches) != 0 || len(x.Protections) == 0 {
+		t.Fatalf("exposure: %+v", x)
 	}
 }

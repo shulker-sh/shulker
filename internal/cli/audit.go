@@ -22,10 +22,11 @@ func (a *app) auditCmd() *cobra.Command {
 		Short:       "Report lock entries and files that deserve a closer look",
 		Long:        "Report what deserves a closer look in the project, or an instance with -i: locked files their provider no longer has, lock entries that download from outside their provider or that it files under another project, files no provider published, jars in mods/ that no longer match the lock or that it doesn't name, and versions younger than security.minReleaseAge. It fails for files gone from their provider and entries from outside it, so CI can gate on it. Name keys to audit only those entries and the ones each named modpack brings.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			b, dirs, err := a.auditTarget(cmd)
+			scope, err := a.auditTarget(cmd)
 			if err != nil {
 				return err
 			}
+			b := scope.builder
 			age, err := a.minReleaseAge()
 			if err != nil {
 				a.printer.Warn("couldn't read security.minReleaseAge, using its default: %v.", err)
@@ -34,7 +35,7 @@ func (a *app) auditCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			rep, err := audit.Run(cmd.Context(), b, audit.Options{Keys: args, Dirs: dirs, MinReleaseAge: age, Now: env.Clock(d.Now)})
+			rep, err := audit.Run(cmd.Context(), b, audit.Options{Keys: args, Dirs: scope.dirs, MinReleaseAge: age, Now: env.Clock(d.Now)})
 			if err != nil {
 				return err
 			}
@@ -48,42 +49,50 @@ func (a *app) auditCmd() *cobra.Command {
 		},
 	}
 	a.scopeFlags(cmd)
-	cmd.AddCommand(a.auditJarCmd(), a.auditFileCmd(), a.auditClassCmd(), a.auditGrepCmd())
+	cmd.AddCommand(a.auditExposureCmd(), a.auditJarCmd(), a.auditFileCmd(), a.auditClassCmd(), a.auditGrepCmd())
 	return cmd
 }
 
-// auditTarget is the builder over what the audit reads, and the directories whose mods/ it checks:
-// the project and the directories its sides were built into, or with -i the instance and the
-// project it runs on.
-func (a *app) auditTarget(cmd *cobra.Command) (*build.Builder, []audit.Dir, error) {
+// auditScope is what an audit reads: the project, the builder over it, the instance -i names, and
+// the directories whose mods/ it checks.
+type auditScope struct {
+	project  *project.Project
+	builder  *build.Builder
+	instance *project.InstanceEntry
+	dirs     []audit.Dir
+}
+
+// auditTarget is the project and the directories its sides were built into, or with -i the
+// instance and the project it runs on.
+func (a *app) auditTarget(cmd *cobra.Command) (auditScope, error) {
 	if a.instance == "" {
 		p, err := a.openProject()
 		if err != nil {
-			return nil, nil, err
+			return auditScope{}, err
 		}
 		b, err := a.auditBuilder(cmd, p)
 		if err != nil {
-			return nil, nil, err
+			return auditScope{}, err
 		}
-		return b, audit.ProjectDirs(b), nil
+		return auditScope{project: p, builder: b, dirs: audit.ProjectDirs(b)}, nil
 	}
 	entry, err := a.scopeInstance()
 	if err != nil {
-		return nil, nil, err
+		return auditScope{}, err
 	}
 	d, err := a.deps()
 	if err != nil {
-		return nil, nil, err
+		return auditScope{}, err
 	}
 	p, dir, err := audit.Instance(d.Cache, entry)
 	if err != nil {
-		return nil, nil, err
+		return auditScope{}, err
 	}
 	b, err := a.auditBuilder(cmd, p)
 	if err != nil {
-		return nil, nil, err
+		return auditScope{}, err
 	}
-	return b, []audit.Dir{dir}, nil
+	return auditScope{project: p, builder: b, instance: &entry, dirs: []audit.Dir{dir}}, nil
 }
 
 func (a *app) auditBuilder(cmd *cobra.Command, p *project.Project) (*build.Builder, error) {
