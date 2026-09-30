@@ -417,6 +417,8 @@ func pastTense(verb string) string {
 		return "kept"
 	case "reading":
 		return "read"
+	case "taking":
+		return "took"
 	}
 	if stem, ok := strings.CutSuffix(verb, "ying"); ok {
 		return stem + "ied"

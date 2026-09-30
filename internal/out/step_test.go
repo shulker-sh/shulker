@@ -181,6 +181,7 @@ func TestPastTense(t *testing.T) {
 		"reading":     "read",
 		"copying":     "copied",
 		"looking":     "looked",
+		"taking":      "took",
 	} {
 		if got := pastTense(verb); got != want {
 			t.Errorf("pastTense(%q) = %q, want %q", verb, got, want)
