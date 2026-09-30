@@ -330,22 +330,32 @@ func (m *tableBrowser) content() string {
 }
 
 // statusLine is the source's status or, without one, the number of rows and, once they have the
-// cursor, its position among them.
+// cursor, its position among them, then how many rows the window hides above and below. The
+// counts sit here rather than in the table so it holds one height as it scrolls.
 func (m *tableBrowser) statusLine() string {
 	n := len(m.values)
+	var line string
 	switch {
 	case m.status != "" || n == 0:
 		return m.status
 	case n == 1:
 		return "1 result"
 	case m.focus == focusResults:
-		return fmt.Sprintf("%d of %d results", m.table.Cursor()+1, n)
+		line = fmt.Sprintf("%d of %d results", m.table.Cursor()+1, n)
+	default:
+		line = fmt.Sprintf("%d results", n)
 	}
-	return fmt.Sprintf("%d results", n)
+	dot := " " + m.theme.GlyphDot() + " "
+	if m.top > 0 {
+		line += dot + fmt.Sprintf("↑ %d more", m.top)
+	}
+	if end := m.top + pickRows; end < len(m.table.Rows()) {
+		line += dot + fmt.Sprintf("↓ %d more", len(m.table.Rows())-end)
+	}
+	return line
 }
 
-// tableView is the header, its rule and the window of rows, with a line above and below it
-// counting the rows it hides that way. Widths are fitted over every row, not just the window, so
+// tableView is the header, its rule and the window of rows. Widths are fitted over every row, not just the window, so
 // columns hold still as it scrolls.
 func (m *tableBrowser) tableView() string {
 	t := m.theme
@@ -386,18 +396,12 @@ func (m *tableBrowser) tableView() string {
 	column := func(col int) lipgloss.Style { return m.b.Styles[min(col, len(m.b.Styles)-1)] }
 	cursor := m.table.Cursor()
 	end := min(m.top+pickRows, len(rows))
-	if m.top > 0 {
-		b.WriteString(gutter + blank + t.Grey(fmt.Sprintf("↑ %d more", m.top)) + "\n")
-	}
 	for i := m.top; i < end; i++ {
 		mark := blank
 		if i == cursor && m.focus == focusResults {
 			mark = arrow
 		}
 		b.WriteString(gutter + mark + line(rows[i], column) + "\n")
-	}
-	if end < len(rows) {
-		b.WriteString(gutter + blank + t.Grey(fmt.Sprintf("↓ %d more", len(rows)-end)) + "\n")
 	}
 	return b.String()
 }

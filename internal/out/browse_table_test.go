@@ -223,23 +223,27 @@ func TestTableBrowserCountsThePosition(t *testing.T) {
 	}
 }
 
-func TestTableBrowserMarksHiddenRows(t *testing.T) {
+func TestTableBrowserCountsHiddenRowsInItsStatus(t *testing.T) {
 	m, _ := newTestBrowser(t, 30)
 	typeQuery(m, "so")
-	if view := m.View().Content; strings.Contains(view, "↑") || !strings.Contains(view, "↓ 20 more\n") {
+	if view := m.View().Content; !strings.Contains(view, "30 results • ↓ 20 more\n") {
 		t.Errorf("at the top:\n%s", view)
 	}
+	height := strings.Count(m.View().Content, "\n")
 	hit(m, "tab")
 	for range 15 {
 		hit(m, "down")
 	}
-	if view := m.View().Content; !strings.Contains(view, "↑ 6 more\n") || !strings.Contains(view, "↓ 14 more\n") {
+	if view := m.View().Content; !strings.Contains(view, "16 of 30 results • ↑ 6 more • ↓ 14 more\n") {
 		t.Errorf("in the middle: top %d\n%s", m.top, view)
+	}
+	if got := strings.Count(m.View().Content, "\n"); got != height {
+		t.Errorf("height %d in the middle, %d at the top", got, height)
 	}
 	for range 14 {
 		hit(m, "down")
 	}
-	if view := m.View().Content; !strings.Contains(view, "↑ 20 more\n") || strings.Count(view, " more\n") != 1 {
+	if view := m.View().Content; !strings.Contains(view, "30 of 30 results • ↑ 20 more\n") {
 		t.Errorf("at the bottom:\n%s", view)
 	}
 	few, _ := newTestBrowser(t, 5)
