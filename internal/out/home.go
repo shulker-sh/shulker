@@ -20,7 +20,8 @@ var home = sync.OnceValue(func() string {
 var hyperlinkTarget = regexp.MustCompile("\x1b\\]8;;[^\x1b]*\x1b\\\\")
 
 // Tilde shortens every path under the home directory in text to one starting with ~, leaving
-// hyperlink targets whole.
+// hyperlink targets whole. A path right after a quote stays whole too: it is a word of a command,
+// and no shell expands ~ inside quotes.
 func Tilde(text string) string {
 	dir := home()
 	if dir == "" || !strings.Contains(text, dir+string(filepath.Separator)) {
@@ -38,5 +39,20 @@ func Tilde(text string) string {
 }
 
 func tildeIn(text, dir string) string {
-	return strings.ReplaceAll(text, dir+string(filepath.Separator), "~"+string(filepath.Separator))
+	prefix := dir + string(filepath.Separator)
+	var b strings.Builder
+	for {
+		i := strings.Index(text, prefix)
+		if i < 0 {
+			b.WriteString(text)
+			return b.String()
+		}
+		b.WriteString(text[:i])
+		if i > 0 && (text[i-1] == '"' || text[i-1] == '\'') {
+			b.WriteString(prefix)
+		} else {
+			b.WriteString("~" + string(filepath.Separator))
+		}
+		text = text[i+len(prefix):]
+	}
 }

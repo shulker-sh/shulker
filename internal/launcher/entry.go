@@ -10,13 +10,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 	"time"
 
 	"shulker.sh/shulker/internal/account"
 	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/out"
 )
 
 const (
@@ -285,7 +285,7 @@ func Relink(l Linked) (command, in string) {
 	}
 	args, in := e.relink(e, l)
 	if l.LauncherDir != "" && l.LauncherDir != e.defaultDir() {
-		args = append(args, "--launcher-dir", shellArg(l.LauncherDir))
+		args = append(args, "--launcher-dir", out.ShellArg(l.LauncherDir))
 	}
 	return strings.Join(args, " "), in
 }
@@ -300,31 +300,31 @@ func Forget(l config.Instance) (Forgotten, error) {
 }
 
 func relinkSync(l Linked) (args []string, in string) {
-	args = []string{"shulker", "sync", shellArg(l.Source)}
+	args = []string{"shulker", "sync", out.ShellArg(l.Source)}
 	if l.Ref != "" {
-		args = append(args, "--ref", shellArg(l.Ref))
+		args = append(args, "--ref", out.ShellArg(l.Ref))
 	}
 	if l.Path != "" {
-		args = append(args, "--path", shellArg(l.Path))
+		args = append(args, "--path", out.ShellArg(l.Path))
 	}
-	args = append(args, "--side", shellArg(l.Side))
+	args = append(args, "--side", out.ShellArg(l.Side))
 	if l.AssumesClient {
 		args = append(args, "--assume-client")
 	}
-	return append(args, "--into", shellArg(l.Dir)), ""
+	return append(args, "--into", out.ShellArg(l.Dir)), ""
 }
 
 // relinkLauncher rebuilds an instance a launcher owns. Every one of them names the source and
 // follows it as a modpack, so the command is the same shape whichever launcher wrote the instance.
 func relinkLauncher(e *Entry, l Linked) (args []string, in string) {
-	args = []string{"shulker", "link", e.Name, shellArg(l.Source)}
+	args = []string{"shulker", "link", e.Name, out.ShellArg(l.Source)}
 	if l.Ref != "" {
-		args = append(args, "--ref", shellArg(l.Ref))
+		args = append(args, "--ref", out.ShellArg(l.Ref))
 	}
 	if l.Path != "" {
-		args = append(args, "--path", shellArg(l.Path))
+		args = append(args, "--path", out.ShellArg(l.Path))
 	}
-	return append(args, "--name", shellArg(l.Label())), ""
+	return append(args, "--name", out.ShellArg(l.Label())), ""
 }
 
 func forgetInstance(e *Entry, l config.Instance) (Forgotten, error) {
@@ -368,15 +368,6 @@ func forgetInstance(e *Entry, l config.Instance) (Forgotten, error) {
 		f.Details = append(f.Details, "Restart the launcher if it's open so it picks up the change")
 	}
 	return f, nil
-}
-
-var plainShellArg = regexp.MustCompile(`^[A-Za-z0-9_./:@%+=,-]+$`)
-
-func shellArg(s string) string {
-	if plainShellArg.MatchString(s) {
-		return s
-	}
-	return CommandArg(s)
 }
 
 // RefreshRow keeps a row that a link or a repair wrote in step with the directory it points at:

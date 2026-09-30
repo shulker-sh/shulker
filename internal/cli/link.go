@@ -164,7 +164,7 @@ func (a *app) linkInto(cmd *cobra.Command, args []string, e *launcher.Entry, k *
 		r.rows = append(r.rows, out.Row{Text: "the launcher syncs this instance before each launch"})
 	}
 	if rep.FeaturesSaved {
-		r.rows = append(r.rows, out.Row{Text: "feature choices saved; change them with `shulker feature on|off <feature> --into " + launcher.CommandArg(rep.GameDir) + "`"})
+		r.rows = append(r.rows, out.Row{Text: "feature choices saved; change them with `shulker feature on|off <feature> --into " + out.ShellArg(rep.GameDir) + "`"})
 	}
 	if rep.Note != "" {
 		r.rows = append(r.rows, out.Row{Text: rep.Note})

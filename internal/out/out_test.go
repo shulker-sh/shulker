@@ -244,6 +244,22 @@ func TestAPlainErrorsHelpEndsInAPeriod(t *testing.T) {
 	}
 }
 
+func TestTildeLeavesQuotedHomePathsWhole(t *testing.T) {
+	dir := home()
+	if dir == "" {
+		t.Skip("no home directory")
+	}
+	path := filepath.Join(dir, "My Pack")
+	for _, text := range []string{`del "` + path + `"`, "--into '" + path + "'"} {
+		if got := Tilde(text); got != text {
+			t.Errorf("Tilde(%s) = %s, want it unchanged", text, got)
+		}
+	}
+	if got := Tilde("in " + path + " and '" + path + "'"); got != "in ~"+string(filepath.Separator)+"My Pack and '"+path+"'" {
+		t.Errorf("Tilde shortened the wrong path: %s", got)
+	}
+}
+
 func TestTildeShortensHomePathsButNotLinkTargets(t *testing.T) {
 	dir := home()
 	if dir == "" {

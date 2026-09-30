@@ -166,7 +166,7 @@ func (s selfUninstallResult) print(l *out.Lines) {
 		l.Nudge("Reinstall, then", "shulker instances repair")
 	}
 	if s.Renamed != "" {
-		l.Nudge("Delete the leftover binary", `del "`+s.Renamed+`"`)
+		l.Nudge("Delete the leftover binary", "del "+out.ShellArg(s.Renamed))
 	}
 	if s.Removed == "" {
 		l.Nudge("Remove it with", route.UninstallCommand())

@@ -9,6 +9,7 @@ import (
 
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/out"
 )
 
 // Shulker is shulker's own instances: folders under its instances root that it builds, keeps
@@ -43,14 +44,14 @@ func Owned(registry []config.Instance, source string) []config.Instance {
 // --name, because the id is also the folder under the instances root, and it carries no side: a
 // shulker instance is a client.
 func relinkShulker(e *Entry, l Linked) (args []string, in string) {
-	args = []string{"shulker", "link", e.Name, shellArg(l.Source)}
+	args = []string{"shulker", "link", e.Name, out.ShellArg(l.Source)}
 	if l.Ref != "" {
-		args = append(args, "--ref", shellArg(l.Ref))
+		args = append(args, "--ref", out.ShellArg(l.Ref))
 	}
 	if l.Path != "" {
-		args = append(args, "--path", shellArg(l.Path))
+		args = append(args, "--path", out.ShellArg(l.Path))
 	}
-	return append(args, "--as", shellArg(l.ID)), ""
+	return append(args, "--as", out.ShellArg(l.ID)), ""
 }
 
 // forgetShulker has nothing to take away. Shulker runs its own hooks in process, so no slot holds a
