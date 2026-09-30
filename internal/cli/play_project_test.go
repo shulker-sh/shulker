@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -112,5 +114,21 @@ func TestPlayInAProjectWithSeveralInstancesAsksWhich(t *testing.T) {
 	}
 	if code == 0 || env.Error.Code != "ambiguous-instance" || len(env.Error.Candidates) != 2 {
 		t.Fatalf("exit %d: %s", code, stdout)
+	}
+}
+
+func TestPlayWaitSaysItCreatedTheInstanceBeforeItLaunched(t *testing.T) {
+	h := newHarness(t)
+	projectPlayHarness(t, h)
+	h.mustRun(t, "accounts", "login", "--use")
+	var both bytes.Buffer
+	a := h.newApp(&both, &both)
+
+	code := a.run(context.Background(), []string{"play", "--yes", "--wait"})
+
+	got := both.String()
+	created, launched := strings.Index(got, "Created instance pack"), strings.Index(got, "Launched pack as Notch")
+	if code != 0 || created < 0 || launched < created {
+		t.Fatalf("exit %d: the instance is made before the game launches:\n%s", code, got)
 	}
 }

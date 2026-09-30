@@ -176,6 +176,21 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 		Sync:     synced,
 		game:     launchGame(plan.Project.Lock),
 	}
+	prepared := func(l *out.Lines) {
+		if linked != nil {
+			linked.print(l)
+		}
+		if synced != nil && !synced.isIdle(l) {
+			synced.print(l)
+		}
+		if adopted {
+			l.Info(who.Name + " is the default account now.")
+		}
+	}
+	// A waited launch says it launched as the game starts, so what readied it prints first.
+	if opts.waits() && !a.printer.JSON {
+		prepared(a.printer.Out())
+	}
 	a.printer.Working("launching %s as %s", in.ID, who.Name)
 	if opts.waits() {
 		var rec instance.Launch
@@ -189,14 +204,8 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 		return err
 	}
 	return a.printer.Emit(res, func(l *out.Lines) {
-		if linked != nil {
-			linked.print(l)
-		}
-		if synced != nil && !synced.isIdle(l) {
-			synced.print(l)
-		}
-		if adopted {
-			l.Info(who.Name + " is the default account now.")
+		if !opts.waits() {
+			prepared(l)
 		}
 		res.print(l)
 	})
