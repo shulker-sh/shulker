@@ -51,3 +51,16 @@ func TestShaderWithNoShaderModIsReported(t *testing.T) {
 		t.Fatalf("no unloadable line: %s", stderr)
 	}
 }
+
+func TestShaderAddSaysHowToTurnItOn(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
+	if stdout := h.mustRun(t, "shader", "add", "complementary-reimagined"); !strings.Contains(stdout, "shulker set client.shader complementary-reimagined") {
+		t.Fatalf("no nudge to turn the shader on: %s", stdout)
+	}
+	h.mustRun(t, "set", "client.shader", "")
+	h.mustRun(t, "shader", "remove", "complementary-reimagined")
+	if stdout := h.mustRun(t, "shader", "add", "complementary-reimagined"); strings.Contains(stdout, "client.shader") {
+		t.Fatalf("nudged with client.shader already chosen: %s", stdout)
+	}
+}

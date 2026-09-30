@@ -226,6 +226,9 @@ func (a *app) relock(cmd *cobra.Command, plan relockPlan, run func(*project.Proj
 		if optional > 0 {
 			optionalNudge(l, optional)
 		}
+		if key := unchosenShader(p.Manifest, res.Added); key != "" {
+			l.Nudge("Turn it on in the game with", "shulker set client.shader "+key)
+		}
 		if !created && res.IsEmpty() {
 			if plan.upToDate != nil {
 				plan.upToDate(l)
@@ -511,4 +514,19 @@ func sideText(side string) string {
 		return "client and server"
 	}
 	return side + " only"
+}
+
+// unchosenShader is the first shader a relock added while the manifest names none to turn on, since
+// a build only enables the one client.shader names.
+func unchosenShader(m *manifest.Manifest, added []resolve.AddedMod) string {
+	if m.Client != nil && m.Client.Shader != nil {
+		return ""
+	}
+	shaders := m.Shaders()
+	for _, a := range added {
+		if _, ok := shaders[a.ID]; ok {
+			return a.ID
+		}
+	}
+	return ""
 }
