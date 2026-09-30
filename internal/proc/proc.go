@@ -14,7 +14,11 @@ func ExitCode(err error) (int, error) {
 	}
 	var exit *exec.ExitError
 	if errors.As(err, &exit) {
-		return exit.ExitCode(), nil
+		return signed(exit.ExitCode()), nil
 	}
 	return 0, err
 }
+
+// signed reads a status as the program meant it: Windows reports its 32-bit exit code unsigned,
+// so a Java System.exit(-1) arrives as 4294967295.
+func signed(code int) int { return int(int32(code)) }
