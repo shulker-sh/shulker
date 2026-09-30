@@ -14,7 +14,7 @@ import (
 func (p *Printer) Confirm(question string, yes bool, in io.Reader) (bool, error) {
 	t := p.ErrTheme
 	keys := huh.NewDefaultKeyMap()
-	keys.Confirm.Toggle = key.NewBinding(key.WithKeys("left", "right", "h", "l", "tab"))
+	keys.Confirm.Toggle = key.NewBinding(key.WithKeys("left", "right", "h", "l", "tab", "space"))
 	keys.Confirm.Reject = key.NewBinding(key.WithKeys("n", "N", "esc"))
 	field := huh.NewConfirm().Title(gutter + question).Affirmative("Yes").Negative("No").Inline(true).WithButtonAlignment(lipgloss.Left).Value(&yes)
 	p.openPrompt()
