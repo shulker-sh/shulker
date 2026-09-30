@@ -48,6 +48,7 @@ func Detect(stdout, stderr io.Writer, opts Options) (out, err Theme) {
 	out, err = base, base
 	out.HasColor, err.HasColor = color && outTTY, color && errTTY
 	out.HasLinks, err.HasLinks = supportsHyperlinks(outTTY), supportsHyperlinks(errTTY)
+	out.ASCII, err.ASCII = opts.ASCII || legacyCodePage(outTTY), opts.ASCII || legacyCodePage(errTTY)
 	return out, err
 }
 
