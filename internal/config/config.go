@@ -33,7 +33,7 @@ const (
 )
 
 // Keys are the config.json keys `shulker config` reads and sets.
-var Keys = []string{"accounts.default", "accounts.stores", "curseforge.key", "downloads.watch", "eula", "instances", "log.keepDays", "play.java", "play.jvmArgs", "play.memory", "play.saveBackups", "play.window", "play.wrapper", "registry", "saves", "security.minReleaseAge", "store"}
+var Keys = []string{"accounts.default", "accounts.stores", "cache.clone", "curseforge.key", "downloads.watch", "eula", "instances", "log.keepDays", "play.java", "play.jvmArgs", "play.memory", "play.saveBackups", "play.window", "play.wrapper", "registry", "saves", "security.minReleaseAge", "store"}
 
 // Secrets are the keys whose values `shulker config` masks unless asked to reveal them.
 var Secrets = []string{"curseforge.key"}
@@ -70,6 +70,7 @@ func Redact(doc map[string]any, mask func(string) string) map[string]any {
 // Config is config.json.
 type Config struct {
 	Accounts   Accounts   `json:"accounts"`
+	Cache      Cache      `json:"cache"`
 	CurseForge CurseForge `json:"curseforge"`
 	Downloads  Downloads  `json:"downloads"`
 	EULA       bool       `json:"eula,omitempty"`
@@ -135,6 +136,14 @@ func (s Security) ReleaseAge() time.Duration {
 }
 
 // Downloads is where a wait for manual downloads looks besides a project's downloads/.
+type Cache struct {
+	// Clone is nil when unset, which clones files out of the cache where the filesystem can.
+	Clone *bool `json:"clone,omitempty"`
+}
+
+// Clones reports whether builds place cached files as copy-on-write clones.
+func (c Cache) Clones() bool { return c.Clone == nil || *c.Clone }
+
 type Downloads struct {
 	// Watch is nil when unset, which watches the home folder's Downloads, and empty to watch none.
 	Watch *[]string `json:"watch,omitempty"`

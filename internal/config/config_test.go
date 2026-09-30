@@ -316,3 +316,18 @@ func TestOSDownloadsReadsLinuxUserDirs(t *testing.T) {
 		t.Fatalf("elsewhere it is ~/Downloads: %s", got)
 	}
 }
+
+func TestCacheCloneDefaultsOn(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	for doc, want := range map[string]bool{`{}`: true, `{"clone":true}`: true, `{"clone":false}`: false} {
+		os.WriteFile(path, []byte(`{"$schema":"https://shulker.sh/schema/v1/config.json","cache":`+doc+`}`), 0o600)
+		cfg, err := LoadFile(path)
+		if err != nil || cfg.Cache.Clones() != want {
+			t.Fatalf("cache %s: clones %v, %v", doc, cfg.Cache.Clones(), err)
+		}
+	}
+	os.WriteFile(path, []byte(`{"$schema":"https://shulker.sh/schema/v1/config.json","cache":{"clone":"no"}}`), 0o600)
+	if _, err := LoadFile(path); err == nil {
+		t.Fatal("a cache.clone that isn't a boolean was taken")
+	}
+}

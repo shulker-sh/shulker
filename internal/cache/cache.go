@@ -19,6 +19,8 @@ import (
 
 type Cache struct {
 	Dir string
+	// NoClone copies every file CopyTo places, never cloning or reflinking it.
+	NoClone bool
 }
 
 func Open() (*Cache, error) {
@@ -210,20 +212,14 @@ func (c *Cache) fetch(ctx context.Context, client *fetch.Client, url string, che
 // the player owns, so any mod in any instance can rewrite one.
 var ErrChanged = errors.New("the cached object changed")
 
-// CopyTo places the object sha at dst. The copy is hashed before it replaces dst; a copy that
-// doesn't match removes the object and returns ErrChanged, leaving dst as it was.
+// CopyTo places the object sha at dst, as a copy-on-write clone where the filesystem makes one and
+// a copy elsewhere. The placed file is hashed before it replaces dst; one that doesn't match removes
+// the object and returns ErrChanged, leaving dst as it was.
 func (c *Cache) CopyTo(sha, dst string) error {
-	src, err := os.Open(c.Object(sha))
-	if err != nil {
-		return err
-	}
-	defer src.Close()
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
 	}
-	// The copy is hashed from the written temp file rather than through a tee: io.Copy from a bare
-	// *os.File uses copy_file_range, which clones on Btrfs and XFS (docs/research/cache-clones.md).
-	err = fsutil.WriteFromChecked(dst, src, func(tmp string) error {
+	err := fsutil.CloneChecked(dst, c.Object(sha), !c.NoClone, func(tmp string) error {
 		got, err := fsutil.SHA512(tmp)
 		if err != nil {
 			return err
@@ -234,7 +230,6 @@ func (c *Cache) CopyTo(sha, dst string) error {
 		return nil
 	})
 	if errors.Is(err, ErrChanged) {
-		src.Close()
 		if err := os.Remove(c.Object(sha)); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}

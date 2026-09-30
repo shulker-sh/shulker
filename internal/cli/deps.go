@@ -72,6 +72,7 @@ func (a *app) deps() (*deps, error) {
 	case err != nil:
 		return nil, err
 	}
+	c.NoClone = !cfg.Cache.Clones()
 	f := fetch.New(a.build().Version)
 	f.Waiting = a.printer.Waiting
 	mr := modrinth.New(f)

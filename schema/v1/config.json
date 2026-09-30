@@ -30,6 +30,17 @@
         }
       }
     },
+    "cache": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "clone": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether builds place files from the cache as copy-on-write clones where the filesystem can make them (APFS, Btrfs, XFS, and ReFS or Dev Drive on Windows 11 24H2), so an instance's mods take no extra disk space. Elsewhere, and when false, each file is copied."
+        }
+      }
+    },
     "curseforge": {
       "type": "object",
       "additionalProperties": false,

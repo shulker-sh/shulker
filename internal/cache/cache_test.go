@@ -9,10 +9,12 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/fsutil"
 )
 
 func sha1Of(content string) string {
@@ -212,5 +214,39 @@ func TestCopyToRefusesAChangedObject(t *testing.T) {
 	}
 	if entries, _ := os.ReadDir(dir); len(entries) != 1 {
 		t.Fatalf("a temp file was left beside the destination: %v", entries)
+	}
+}
+
+func TestCopyToClonesOrCopiesAFileTheObjectDoesntShare(t *testing.T) {
+	for _, noClone := range []bool{false, true} {
+		c := newCache(t)
+		c.NoClone = noClone
+		sha, err := c.Put(strings.NewReader("a mod"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		dir := filepath.Join(t.TempDir(), "mods")
+		dst := filepath.Join(dir, "a.jar")
+		if err := c.CopyTo(sha, dst); err != nil {
+			t.Fatal(err)
+		}
+		if data, err := os.ReadFile(dst); err != nil || string(data) != "a mod" {
+			t.Fatalf("noClone %v: placed %q, %v", noClone, data, err)
+		}
+		if info, err := os.Stat(dst); err != nil || runtime.GOOS != "windows" && info.Mode().Perm() != 0o644 {
+			t.Fatalf("noClone %v: placed with %v, %v", noClone, info.Mode(), err)
+		}
+		if entries, _ := os.ReadDir(dir); len(entries) != 1 {
+			t.Fatalf("noClone %v: a temp file was left beside the destination: %v", noClone, entries)
+		}
+		f, err := os.OpenFile(dst, os.O_WRONLY|os.O_APPEND, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.WriteString(", infected")
+		f.Close()
+		if got, err := fsutil.SHA512(c.Object(sha)); err != nil || got != sha {
+			t.Fatalf("noClone %v: a write to the placed file reached the object: %v", noClone, err)
+		}
 	}
 }
