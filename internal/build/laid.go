@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// Laid is a jar or pack an override folder lays: where it lands in the side's directory, the folder
+// Laid is a file an override folder lays: where it lands in the side's directory, the folder
 // it comes from as the build labels it, and the modpack that brings the folder, if one does.
 type Laid struct {
 	Path    string `json:"path"`
@@ -19,14 +19,21 @@ type Laid struct {
 
 // LaidJars is every jar, and every pack zip in a pack folder, that the side's override folders
 // lay, with every feature on, since each is a file that reaches the game without any provider.
-func (b *Builder) LaidJars(side string) ([]Laid, error) {
+func (b *Builder) LaidJars(side string) ([]Laid, error) { return b.laid(side, isJarOrPack) }
+
+// LaidFiles is every file the side's override folders lay, with every feature on.
+func (b *Builder) LaidFiles(side string) ([]Laid, error) {
+	return b.laid(side, func(string) bool { return true })
+}
+
+func (b *Builder) laid(side string, keep func(rel string) bool) ([]Laid, error) {
 	cond := b.conditions(Options{})
 	for name := range cond.features {
 		cond.features[name] = true
 	}
 	var laid []Laid
 	add := func(l overrideLayer, rel string) {
-		if !l.skips(rel) && isJarOrPack(rel) {
+		if !l.skips(rel) && keep(rel) {
 			laid = append(laid, Laid{Path: rel, Folder: l.label, Modpack: l.pack})
 		}
 	}
