@@ -259,3 +259,25 @@ func TestSetToTheSameValueSaysSo(t *testing.T) {
 		t.Fatalf("set to the same value: %s", stdout)
 	}
 }
+
+func TestQuotesStrippedSpotsAListAShellUnquoted(t *testing.T) {
+	for value, want := range map[string]bool{`[cmd,/c]`: true, `{a:1}`: true, `["cmd","/c"]`: false, `cmd`: false, `[1,2`: true, `'[shulker,prism]'`: true} {
+		if got := quotesStripped(value); got != want {
+			t.Errorf("quotesStripped(%q) = %v, want %v", value, got, want)
+		}
+	}
+}
+
+func TestStrippedQuotesHelpPutsTheQuotesBack(t *testing.T) {
+	for value, want := range map[string]string{
+		`[shulker,prism]`:     `'[\"shulker\",\"prism\"]' in PowerShell 5.1, [\"shulker\",\"prism\"] in cmd`,
+		`'[shulker,prism]'`:   `[\"shulker\",\"prism\"] in cmd`,
+		`['shulker','prism']`: `[\"shulker\",\"prism\"] in cmd`,
+		`{enabled:true,n:2}`:  `{\"enabled\":true,\"n\":2} in cmd`,
+		`[1,2`:                `escape each one as \"`,
+	} {
+		if got := strippedQuotesHelp(value); !strings.HasSuffix(got, want) {
+			t.Errorf("strippedQuotesHelp(%s) = %s, want it to end %s", value, got, want)
+		}
+	}
+}

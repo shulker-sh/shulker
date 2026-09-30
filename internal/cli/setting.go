@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -232,7 +233,64 @@ func decodeLiteral(path, value string) (any, error) {
 	dec.UseNumber()
 	var v any
 	if err := dec.Decode(&v); err != nil || dec.More() {
-		return nil, out.Errorf("usage", "--literal takes a JSON value for %s, got %q", path, value)
+		e := out.Errorf("usage", "--literal takes a JSON value for %s, got %q", path, value)
+		if runtime.GOOS == "windows" && quotesStripped(value) {
+			e.Help = strippedQuotesHelp(value)
+		}
+		return nil, e
 	}
 	return v, nil
+}
+
+// quotesStripped reports whether value reads as a JSON list or object whose double quotes a shell
+// took out, as Windows PowerShell 5.1 and cmd do. cmd also passes single quotes through, so a
+// value wrapped in them counts too.
+func quotesStripped(value string) bool {
+	value = unwrapSingle(strings.TrimSpace(value))
+	return (strings.HasPrefix(value, "[") || strings.HasPrefix(value, "{")) && !strings.Contains(value, `"`)
+}
+
+// strippedQuotesHelp shows the value with its double quotes put back and escaped, in the form each
+// Windows shell passes on intact, since shulker can't tell which shell ran it.
+func strippedQuotesHelp(value string) string {
+	fixed, ok := requote(value)
+	if !ok {
+		return `the shell dropped the double quotes; escape each one as \"`
+	}
+	escaped := strings.ReplaceAll(fixed, `"`, `\"`)
+	return "the shell dropped the double quotes; escape each one: '" + escaped + "' in PowerShell 5.1, " + escaped + " in cmd"
+}
+
+// requote puts double quotes back around every bare word in a list or object whose quotes a shell
+// dropped, leaving numbers, true, false and null bare. It reports false when the result still isn't
+// JSON.
+func requote(value string) (string, bool) {
+	value = unwrapSingle(strings.TrimSpace(value))
+	var b strings.Builder
+	word := func(w string) {
+		t := unwrapSingle(strings.TrimSpace(w))
+		if t == "" || t == "true" || t == "false" || t == "null" || json.Valid([]byte(t)) && !strings.ContainsAny(t, "[]{}") {
+			b.WriteString(t)
+			return
+		}
+		q, _ := json.Marshal(t)
+		b.Write(q)
+	}
+	start := 0
+	for i, r := range value {
+		if strings.ContainsRune("[]{},:", r) {
+			word(value[start:i])
+			b.WriteRune(r)
+			start = i + 1
+		}
+	}
+	word(value[start:])
+	return b.String(), json.Valid([]byte(b.String()))
+}
+
+func unwrapSingle(s string) string {
+	if len(s) >= 2 && s[0] == '\'' && s[len(s)-1] == '\'' {
+		return s[1 : len(s)-1]
+	}
+	return s
 }
