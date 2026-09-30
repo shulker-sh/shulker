@@ -4,6 +4,7 @@ package fsutil
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/sha1"
 	"crypto/sha512"
 	"encoding/hex"
@@ -35,6 +36,60 @@ func WriteFromChecked(path string, r io.Reader, check func(tmp string) error) er
 
 // writeFrom is WriteFrom with the mode a new file gets and an optional check.
 func writeFrom(path string, r io.Reader, mode fs.FileMode, check func(tmp string) error) error {
+	return place(path, mode, func(tmp string) error {
+		f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+		if err != nil {
+			return err
+		}
+		if _, err := io.Copy(f, r); err != nil {
+			f.Close()
+			return err
+		}
+		return f.Close()
+	}, check)
+}
+
+// CloneChecked places a copy of the file src at path, with check looking at the placed temp file
+// before it replaces path. With clone it tries a copy-on-write clone first and copies when the
+// filesystem can't clone. A clone never shares writes with src, as a hard link would.
+func CloneChecked(path, src string, clone bool, check func(tmp string) error) error {
+	return place(path, 0o644, func(tmp string) error {
+		if clone && cloneFile(src, tmp) == nil {
+			return nil
+		}
+		os.Remove(tmp)
+		return copyFile(src, tmp, clone)
+	}, check)
+}
+
+// copyFile copies src to dst, which must not exist. io.Copy between two bare *os.File values uses
+// copy_file_range, which reflinks on Btrfs and XFS and copies server-side on NFS 4.2 and SMB, so
+// without fast both are hidden from it and the bytes go through a plain loop.
+func copyFile(src, dst string, fast bool) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return err
+	}
+	if fast {
+		_, err = io.Copy(out, in)
+	} else {
+		_, err = io.Copy(struct{ io.Writer }{out}, struct{ io.Reader }{in})
+	}
+	if cerr := out.Close(); err == nil {
+		err = cerr
+	}
+	return err
+}
+
+// place has fill create a temp file beside path, gives it path's mode, lets check look at it, and
+// renames it over path. A symlink at path is followed; an existing file keeps its mode and must be
+// writable.
+func place(path string, mode fs.FileMode, fill func(tmp string) error, check func(tmp string) error) error {
 	if target, err := filepath.EvalSymlinks(path); err == nil {
 		path = target
 	}
@@ -48,28 +103,33 @@ func writeFrom(path string, r io.Reader, mode fs.FileMode, check func(tmp string
 		}
 		f.Close()
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*.tmp")
+	tmp, err := tempName(path)
 	if err != nil {
 		return err
 	}
-	defer os.Remove(tmp.Name())
-	if _, err := io.Copy(tmp, r); err != nil {
-		tmp.Close()
+	defer os.Remove(tmp)
+	if err := fill(tmp); err != nil {
 		return err
 	}
-	if err := tmp.Chmod(mode); err != nil {
-		tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
+	if err := os.Chmod(tmp, mode); err != nil {
 		return err
 	}
 	if check != nil {
-		if err := check(tmp.Name()); err != nil {
+		if err := check(tmp); err != nil {
 			return err
 		}
 	}
-	return os.Rename(tmp.Name(), path)
+	return os.Rename(tmp, path)
+}
+
+// tempName is a fresh hidden name beside path. It isn't created, since a clone refuses a path
+// that exists.
+func tempName(path string) (string, error) {
+	b := make([]byte, 8)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return filepath.Join(filepath.Dir(path), "."+filepath.Base(path)+"."+hex.EncodeToString(b)+".tmp"), nil
 }
 
 // Replace writes data to path after moving whatever is there aside. The new
