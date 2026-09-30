@@ -146,6 +146,8 @@ type harness struct {
 	// watching counts the watchers a launch left running, so a test's directories outlive the runs
 	// they are still recording.
 	watching sync.WaitGroup
+	// grace is the watcher's early-exit wait, 0 so a launch returns at once unless a test asks.
+	grace time.Duration
 	// installerFetchedClient says a client install found no vanilla jar and downloaded one itself.
 	installerFetchedClient bool
 }
@@ -158,11 +160,14 @@ func (h *harness) watch(req game.Launch) (int, error) {
 	h.watching.Add(1)
 	go func() {
 		defer h.watching.Done()
-		h.newApp(io.Discard, io.Discard).watchRun(req, nil, func(r watchReply) { started <- r })
+		h.newApp(io.Discard, io.Discard).watchRun(req, nil, h.grace, func(r watchReply) { started <- r })
 	}()
 	r := <-started
 	if r.Error != "" {
 		return 0, notStarted(r.Error)
+	}
+	if r.Exited {
+		return 0, exitedAtStart(r, req.Log)
 	}
 	return r.PID, nil
 }

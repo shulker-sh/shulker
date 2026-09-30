@@ -263,7 +263,7 @@ func TestAWatchedLaunchThatNeverStartedReachesTheInstanceList(t *testing.T) {
 	a := h.newApp(os.Stderr, os.Stderr)
 
 	var reply watchReply
-	rec := a.watchRun(game.Launch{Dir: gameDir, Java: missing, Log: filepath.Join(gameDir, instance.Dir, "logs", "x.log")}, nil, func(r watchReply) { reply = r })
+	rec := a.watchRun(game.Launch{Dir: gameDir, Java: missing, Log: filepath.Join(gameDir, instance.Dir, "logs", "x.log")}, nil, 0, func(r watchReply) { reply = r })
 
 	if reply.PID != 0 || !strings.HasPrefix(reply.Error, "run "+missing+": ") {
 		t.Fatalf("the watcher answers with why nothing started: %+v", reply)
@@ -355,5 +355,36 @@ func TestReconcileClosesEveryRunWhoseGameHasGone(t *testing.T) {
 	}
 	if records[1].EndedAt != "" {
 		t.Fatalf("a run still going stays open: %+v", records[1])
+	}
+}
+
+func TestPlayFailsForAGameThatExitsAsItStarts(t *testing.T) {
+	h := newHarness(t)
+	_, gameDir := playHarness(t, h)
+	h.mustRun(t, "accounts", "login", "--use")
+	playGame(t, gameDir, "echo 'The command line is too long.'\nexit 1\n")
+	h.grace = 5 * time.Second
+
+	code, stdout, stderr := h.run(t, "play", "-i", "pack")
+
+	if code == 0 || !strings.Contains(stderr, "Minecraft exited as it started (exit code 1): The command line is too long.") || strings.Contains(stdout, "Launched") {
+		t.Fatalf("exit %d:\n%s%s", code, stdout, stderr)
+	}
+	if run := onlyRun(t, gameDir); run.ExitCode != 1 || run.EndedAt == "" {
+		t.Fatalf("the failed run is still recorded: %+v", run)
+	}
+}
+
+func TestPlayLaunchesAGameStillRunningAfterTheGrace(t *testing.T) {
+	h := newHarness(t)
+	_, gameDir := playHarness(t, h)
+	h.mustRun(t, "accounts", "login", "--use")
+	playGame(t, gameDir, "sleep 1\nexit 1\n")
+	h.grace = 100 * time.Millisecond
+
+	code, stdout, stderr := h.run(t, "play", "-i", "pack")
+
+	if code != 0 || !strings.Contains(stdout, "Launched pack as Notch") {
+		t.Fatalf("exit %d:\n%s%s", code, stdout, stderr)
 	}
 }

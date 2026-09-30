@@ -257,7 +257,7 @@ func (a *app) playWaited(launch game.Launch, stream bool, launched string) (int,
 	}
 	a.printer.Settle()
 	var pid int
-	rec := a.watchRun(launch, mirror, func(r watchReply) {
+	rec := a.watchRun(launch, mirror, 0, func(r watchReply) {
 		pid = r.PID
 		if pid != 0 && !a.printer.JSON {
 			a.printer.Err().OK(launched, "")

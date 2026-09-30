@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/game"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/out"
@@ -20,7 +21,15 @@ import (
 type watchReply struct {
 	PID   int    `json:"pid,omitempty"`
 	Error string `json:"error,omitempty"`
+	// Exited is a game that failed within the grace period, with its status and its log's last line.
+	Exited   bool   `json:"exited,omitempty"`
+	ExitCode int    `json:"exitCode,omitempty"`
+	LastLine string `json:"lastLine,omitempty"`
 }
+
+// earlyExitGrace is how long the watcher waits before saying the game started, so a game or wrapper
+// that fails at once is reported as a failure rather than a launch.
+const earlyExitGrace = 2 * time.Second
 
 // watchCmd is the watcher: shulker re-execed hidden and detached so that a run nobody is waiting for
 // still ends in a record. It is hidden because its one argument is a launch on stdin, which nothing
@@ -42,7 +51,7 @@ func (a *app) watchCmd() *cobra.Command {
 			// The line below is the last thing this process writes anywhere but the record: whoever
 			// asked for the launch has gone by the time the game exits, and writing to a pipe with
 			// nobody on the other end would end the watch.
-			a.watchRun(req, nil, func(r watchReply) {
+			a.watchRun(req, nil, earlyExitGrace, func(r watchReply) {
 				if line, err := json.Marshal(r); err == nil {
 					fmt.Fprintln(a.printer.Stdout, string(line))
 				}
@@ -54,8 +63,9 @@ func (a *app) watchCmd() *cobra.Command {
 
 // watchRun is the watched run itself: start the game, say what started, wait for it, and record how
 // it ended. The watcher and a foreground `play --wait` are both this function — the only difference
-// is who running answers, and whether anyone is still listening once the game has gone.
-func (a *app) watchRun(req game.Launch, stream io.Writer, running func(watchReply)) instance.Launch {
+// is who running answers, and whether anyone is still listening once the game has gone. With a
+// grace period, running waits that long first, and a game that failed within it is said to have.
+func (a *app) watchRun(req game.Launch, stream io.Writer, grace time.Duration, running func(watchReply)) instance.Launch {
 	var s instance.Settings
 	if f, err := instance.Load(req.Dir); err == nil {
 		s = f.Settings
@@ -82,17 +92,53 @@ func (a *app) watchRun(req game.Launch, stream io.Writer, running func(watchRepl
 	if err != nil {
 		a.printer.Warn("%v", err)
 	}
+	ended := make(chan int, 1)
+	go func() {
+		code, err := g.Wait()
+		if err != nil {
+			// The game ran, so the run is real; what shulker lost is only the status it ended with.
+			code = instance.NoExitCode
+		}
+		ended <- code
+	}()
+	closeRun := func(code int) instance.Launch {
+		rec, err := instance.CloseRun(req.Dir, s.LaunchKeep(), g.PID, code)
+		if err != nil {
+			a.printer.Warn("%v", err)
+		}
+		return rec
+	}
+	if grace > 0 {
+		select {
+		case code := <-ended:
+			rec := closeRun(code)
+			if code == 0 || code == instance.NoExitCode {
+				running(watchReply{PID: g.PID})
+			} else {
+				running(watchReply{PID: g.PID, Exited: true, ExitCode: code, LastLine: lastLogLine(req.Log)})
+			}
+			return rec
+		case <-time.After(grace):
+		}
+	}
 	running(watchReply{PID: g.PID})
-	code, err := g.Wait()
+	return closeRun(<-ended)
+}
+
+// lastLogLine is the last line a run wrote to its log, which for a game that failed at once is
+// usually why.
+func lastLogLine(path string) string {
+	f, err := os.Open(path)
 	if err != nil {
-		// The game ran, so the run is real; what shulker lost is only the status it ended with.
-		code = instance.NoExitCode
+		return ""
 	}
-	rec, err := instance.CloseRun(req.Dir, s.LaunchKeep(), g.PID, code)
+	defer f.Close()
+	tail, err := fsutil.ReadTail(f, 1)
 	if err != nil {
-		a.printer.Warn("%v", err)
+		return ""
 	}
-	return rec
+	lines := strings.Split(strings.TrimSpace(tail), "\n")
+	return strings.TrimSpace(lines[len(lines)-1])
 }
 
 // startWatcher hands the launch to the watcher and reports the game it started. Tests replace it,
@@ -120,5 +166,17 @@ func (a *app) startWatcher(req game.Launch) (int, error) {
 	if reply.Error != "" {
 		return 0, notStarted(reply.Error)
 	}
+	if reply.Exited {
+		return 0, exitedAtStart(reply, req.Log)
+	}
 	return reply.PID, nil
+}
+
+func exitedAtStart(r watchReply, log string) *out.Error {
+	e := out.Errorf("game-exited", "Minecraft exited as it started (exit code %d)", r.ExitCode)
+	if r.LastLine != "" {
+		e.Message += ": " + r.LastLine
+	}
+	e.Rows = []out.Detail{{Label: "log", Text: log}}
+	return e
 }
