@@ -4,6 +4,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"shulker.sh/shulker/internal/mojang"
 )
 
 // The sources a selector names after @. An account shulker signed in itself is @shulker and one it
@@ -55,12 +57,14 @@ func Launchable(accounts []Resolved) []Resolved {
 
 // Resolve is every account the stores yield, in store order: shulker's own file, and what each
 // launcher's reader already took from it. One Microsoft account can sit in several launchers, so
-// the list is deduped by id and the earliest store wins.
+// the list is deduped by id and the earliest store wins. Every id comes out as a dashed UUID,
+// whichever form its launcher stored.
 func Resolve(stores []string, own Store, fromLaunchers map[string][]Resolved) []Resolved {
 	var out []Resolved
 	seen := map[string]bool{}
 	for _, p := range stores {
 		for _, r := range fromStore(p, own, fromLaunchers) {
+			r.ID = mojang.Dashed(r.ID)
 			if r.ID == "" || seen[NormalizeID(r.ID)] {
 				continue
 			}
@@ -121,10 +125,10 @@ func WithoutProfile(accounts []Resolved) []Resolved {
 	return kept
 }
 
-// ByID is the account with exactly this id, as the registry or an instance file records it.
+// ByID is the account with this id, as the registry or an instance file records it, dashed or not.
 func ByID(accounts []Resolved, id string) (Resolved, bool) {
 	for _, r := range accounts {
-		if r.ID == id {
+		if SameID(r.ID, id) {
 			return r, true
 		}
 	}

@@ -174,6 +174,17 @@ func TestResolveIgnoresAStoreThatFoundNothing(t *testing.T) {
 	}
 }
 
+func TestResolveDashesALaunchersUUID(t *testing.T) {
+	fromLaunchers := map[string][]Resolved{"mojang": {{ID: "069A79F444E94726A5BEFCA90E38AAF5", Name: "Notch", Source: "mojang", Group: GroupLauncher}}}
+	got := Resolve([]string{"mojang"}, Store{}, fromLaunchers)
+	if len(got) != 1 || got[0].ID != "069a79f4-44e9-4726-a5be-fca90e38aaf5" {
+		t.Fatalf("got %+v", got)
+	}
+	if _, ok := ByID(got, "069a79f444e94726a5befca90e38aaf5"); !ok {
+		t.Fatal("ByID missed the account by its undashed id")
+	}
+}
+
 func TestResolveTakesTheEarliestStoresCopyOfAnAccount(t *testing.T) {
 	id := "069a79f4-44e9-4726-a5be-fca90e38aaf5"
 	fromLaunchers := map[string][]Resolved{"prism": {{
