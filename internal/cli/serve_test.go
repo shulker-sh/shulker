@@ -37,7 +37,7 @@ func TestServeRunsServerAndStops(t *testing.T) {
 	h.tty = true
 	h.stdin = strings.NewReader("y\n")
 	code, _, stderr = h.run(t, "--no-input", "serve")
-	if code == 0 || strings.Contains(stderr, "Accept and record") || !strings.Contains(stderr, "--yes") {
+	if code == 0 || strings.Contains(stderr, "Accept and record") || !strings.Contains(stderr, "--accept-eula") {
 		t.Fatalf("--no-input must decline without asking: %d %s", code, stderr)
 	}
 	if h.configEula(t) != nil {
@@ -46,7 +46,7 @@ func TestServeRunsServerAndStops(t *testing.T) {
 	h.tty = false
 
 	h.stdin = strings.NewReader("say hi\nstop\n")
-	code, stdout, stderr := h.run(t, "serve", "--yes")
+	code, stdout, stderr := h.run(t, "serve", "--accept-eula")
 	if h.configEula(t) != true {
 		t.Fatal("accepting must record eula: true in config.json")
 	}
@@ -194,7 +194,7 @@ func TestManagedJava(t *testing.T) {
 	}
 
 	h.stdin = strings.NewReader("stop\n")
-	code, stdout, stderr = h.run(t, "--json", "serve", "--yes")
+	code, stdout, stderr = h.run(t, "--json", "serve", "--accept-eula")
 	if code != 0 {
 		t.Fatalf("serve: %d %s %s", code, stdout, stderr)
 	}
@@ -233,7 +233,7 @@ func TestManagedJavaUnavailable(t *testing.T) {
 		t.Fatalf("install should warn about the missing runtime: %s", stderr)
 	}
 	h.stdin = strings.NewReader("stop\n")
-	_, _, stderr = h.run(t, "serve", "--yes")
+	_, _, stderr = h.run(t, "serve", "--accept-eula")
 	if !strings.Contains(stderr, "using java on PATH") {
 		t.Fatalf("serve should fall back to PATH java: %s", stderr)
 	}
@@ -244,7 +244,7 @@ func TestServeInstallsWhatTheLockNeeds(t *testing.T) {
 	h.mustRun(t, "create", "--name", "pack", "--side", "server", "--loader", "neoforge")
 	h.editManifest(t, func(m map[string]any) { m["java"] = h.fakeJDK(t, "25.0.1", "0") })
 	h.stdin = strings.NewReader("stop\n")
-	stdout, _ := h.mustRunStderr(t, "serve", "--yes")
+	stdout, _ := h.mustRunStderr(t, "serve", "--accept-eula")
 	if !strings.Contains(stdout, "Server stopped") {
 		t.Fatalf("serve must fetch the server files itself, not stop at `shulker install`: %s", stdout)
 	}
