@@ -51,6 +51,9 @@ func TestCacheInfoNamesItsRootsAndPruneFreesTheRest(t *testing.T) {
 	if !strings.Contains(stdout, "can be freed") || !strings.Contains(stdout, "shulker cache prune") {
 		t.Fatalf("info should say what prune would free and how: %s", stdout)
 	}
+	if !strings.Contains(stdout, "Builds clone cached files into ") && !strings.Contains(stdout, "can't clone from the cache") {
+		t.Fatalf("info should say whether builds clone: %s", stdout)
+	}
 
 	stdout = h.mustRun(t, "cache", "prune")
 	if !strings.Contains(stdout, " of unused cache data") || !strings.Contains(stdout, " of cache data left") {

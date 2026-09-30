@@ -250,3 +250,14 @@ func TestCopyToClonesOrCopiesAFileTheObjectDoesntShare(t *testing.T) {
 		}
 	}
 }
+
+func TestClonesIntoIsFalseWithCloningOff(t *testing.T) {
+	c := newCache(t)
+	c.NoClone = true
+	if c.ClonesInto(t.TempDir()) {
+		t.Fatal("cache.clone: false still reports cloning")
+	}
+	if entries, _ := os.ReadDir(filepath.Join(c.Dir, "tmp")); len(entries) != 0 {
+		t.Fatalf("the probe left files in the cache: %v", entries)
+	}
+}

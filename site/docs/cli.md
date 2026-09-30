@@ -1839,6 +1839,8 @@ shulker docs --search build directory
 
 Show where the shared download cache is, how much space it uses, how many files it holds, how many of those are manual downloads, how many listing pairs the listing index holds, and how much `cache prune` would free. The roots line names what is keeping files: every instance in the registry, the project you are standing in when there is one, and each lock file `--lock` names, counted as `lock files`. A registered instance or named lock file whose lock can't be read is named as a warning and no prune line is suggested, since `cache prune` refuses while one is unreadable; the prunable figure is then counted as if that instance needed nothing.
 
+A last line says whether builds place files from the cache as clones, found by cloning one file into the instances folder (on Windows, by its volume being ReFS or a Dev Drive on 11 24H2 or later), and `clones` in JSON carries it. A project built in a folder on another volume than the cache copies even when the instances folder clones. See [`cache.clone`](#configuration).
+
 ```sh
 shulker cache info
 ```

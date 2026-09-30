@@ -2,6 +2,8 @@ package fsutil
 
 import (
 	"fmt"
+	"path/filepath"
+	"strings"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -38,4 +40,25 @@ func cloneFile(src, dst string) error {
 		return fmt.Errorf("CopyFile2 %s: HRESULT 0x%08x", dst, uint32(hr))
 	}
 	return nil
+}
+
+// canClone can't try a clone: CopyFile2 succeeds whether it cloned or copied. Windows clones on a
+// ReFS volume, which a Dev Drive is, from 11 24H2 (build 26100), within one volume.
+func canClone(src, dir string) bool {
+	vol := filepath.VolumeName(dir)
+	if vol == "" || !strings.EqualFold(vol, filepath.VolumeName(src)) {
+		return false
+	}
+	if _, _, build := windows.RtlGetNtVersionNumbers(); build&0xffff < 26100 {
+		return false
+	}
+	root, err := windows.UTF16PtrFromString(vol + `\`)
+	if err != nil {
+		return false
+	}
+	name := make([]uint16, windows.MAX_PATH+1)
+	if windows.GetVolumeInformation(root, nil, 0, nil, nil, nil, &name[0], uint32(len(name))) != nil {
+		return false
+	}
+	return windows.UTF16ToString(name) == "ReFS"
 }

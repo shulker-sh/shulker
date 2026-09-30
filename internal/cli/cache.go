@@ -23,6 +23,7 @@ type cacheInfo struct {
 	Locks      int      `json:"locks"`
 	Prunable   int64    `json:"prunable"`
 	Unreadable []string `json:"unreadable,omitempty"`
+	Clones     bool     `json:"clones"`
 }
 
 func (a *app) cacheCmd() *cobra.Command {
@@ -58,7 +59,11 @@ func (a *app) cacheInfoCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			res := cacheInfo{Usage: usage, Roots: r.Count(), Instances: r.Instances, Project: r.Project, LockFiles: r.LockFiles, Locks: len(r.Locks), Prunable: would.Bytes, Unreadable: r.Unreadable}
+			dirs, err := a.roots()
+			if err != nil {
+				return err
+			}
+			res := cacheInfo{Usage: usage, Roots: r.Count(), Instances: r.Instances, Project: r.Project, LockFiles: r.LockFiles, Locks: len(r.Locks), Prunable: would.Bytes, Unreadable: r.Unreadable, Clones: d.Cache.ClonesInto(dirs.Instances)}
 			for _, problem := range r.Unreadable {
 				a.printer.Warn("%s", problem)
 			}
@@ -81,6 +86,7 @@ func (a *app) cacheInfoCmd() *cobra.Command {
 					rows = append(rows, out.Row{Text: out.HumanBytes(would.Bytes) + " can be freed (" + prunedAside(would) + ")"})
 				}
 				l.Tree(rows...)
+				l.Info(cloneText(res.Clones, d.Cache.NoClone, dirs.Instances))
 				if !would.Empty() && len(r.Unreadable) == 0 {
 					l.Nudge("Free it", "shulker cache prune")
 				}
@@ -90,6 +96,17 @@ func (a *app) cacheInfoCmd() *cobra.Command {
 	a.dirFlag(cmd)
 	lockFlag(cmd, &named)
 	return cmd
+}
+
+func cloneText(clones, off bool, instances string) string {
+	switch {
+	case off:
+		return "Builds copy cached files: cache.clone is off"
+	case clones:
+		return "Builds clone cached files into " + out.Tilde(instances) + ", taking no extra space"
+	default:
+		return "Builds copy cached files: " + out.Tilde(instances) + " can't clone from the cache"
+	}
 }
 
 func lockFlag(cmd *cobra.Command, named *[]string) {

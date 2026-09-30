@@ -208,6 +208,20 @@ func (c *Cache) fetch(ctx context.Context, client *fetch.Client, url string, che
 	return sha, c.commit(tmp.Name(), sha, sum1, false)
 }
 
+// ClonesInto reports whether CopyTo places objects in dir as clones, by trying one.
+func (c *Cache) ClonesInto(dir string) bool {
+	if c.NoClone {
+		return false
+	}
+	f, err := c.TempFile("clone")
+	if err != nil {
+		return false
+	}
+	f.Close()
+	defer os.Remove(f.Name())
+	return fsutil.CanClone(f.Name(), dir)
+}
+
 // ErrChanged is a cached object whose bytes no longer hash to its name. Objects are plain files
 // the player owns, so any mod in any instance can rewrite one.
 var ErrChanged = errors.New("the cached object changed")

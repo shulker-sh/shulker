@@ -62,6 +62,21 @@ func CloneChecked(path, src string, clone bool, check func(tmp string) error) er
 	}, check)
 }
 
+// CanClone reports whether a file on src's volume clones into dir, or into the nearest folder above
+// it that exists.
+func CanClone(src, dir string) bool {
+	for {
+		if info, err := os.Stat(dir); err == nil && info.IsDir() {
+			return canClone(src, dir)
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return false
+		}
+		dir = parent
+	}
+}
+
 // copyFile copies src to dst, which must not exist. io.Copy between two bare *os.File values uses
 // copy_file_range, which reflinks on Btrfs and XFS and copies server-side on NFS 4.2 and SMB, so
 // without fast both are hidden from it and the bytes go through a plain loop.
