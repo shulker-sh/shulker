@@ -30,7 +30,8 @@ import (
 
 const agentHelp = `Scripts and agents: pass --json. Every command then prints one JSON object on
 stdout, errors included. Act on error.code rather than the message, and run
-"shulker lock" when lockStale is true.`
+"shulker lock" when lockStale is true. To investigate what a project runs, start
+with "shulker security" and read "shulker docs security".`
 
 type app struct {
 	printer     *out.Printer
