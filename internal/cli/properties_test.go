@@ -28,10 +28,10 @@ func TestPropertiesOverridesMergePerKey(t *testing.T) {
 	if stdout := h.mustRun(t, "build"); !strings.Contains(stdout, "kept: config/iris.properties enableShaders (edited in place)") {
 		t.Fatalf("an in-game edit of a managed key should be kept: %s", stdout)
 	}
-	if stdout := h.mustRun(t, "pull"); !strings.Contains(stdout, "pulled: config/iris.properties enableShaders ⟶ overrides/config/iris.properties") {
+	if stdout := h.mustRun(t, "pull"); !strings.Contains(stdout, "pulled: config/iris.properties enableShaders → overrides/config/iris.properties") {
 		t.Fatalf("pull: %s", stdout)
 	}
-	if stdout := h.mustRun(t, "pull", "config/iris.properties", "--key", "colorSpace"); !strings.Contains(stdout, "adopted: config/iris.properties colorSpace ⟶ overrides/config/iris.properties") {
+	if stdout := h.mustRun(t, "pull", "config/iris.properties", "--key", "colorSpace"); !strings.Contains(stdout, "adopted: config/iris.properties colorSpace → overrides/config/iris.properties") {
 		t.Fatalf("pull --key: %s", stdout)
 	}
 

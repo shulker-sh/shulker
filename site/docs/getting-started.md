@@ -84,7 +84,7 @@ If you are already signed in to another launcher (Prism Launcher, MultiMC, the M
 
 ```console
 ❯ shulker accounts stores add prism
-~ accounts.stores ["shulker"] ⟶ ["shulker","prism"]
+~ accounts.stores ["shulker"] → ["shulker","prism"]
 ❯ shulker accounts
      Account  UUID                                  Group     State
   ✔  Steve    8667ba71-b85a-3d5b-af5f-cb2f6e9c7d21  own       playable

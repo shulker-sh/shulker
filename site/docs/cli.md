@@ -112,7 +112,7 @@ These work with every command.
 | `--json` | Print machine-readable JSON, including errors; see [JSON output](#json-output) |
 | `--no-input` | Ask nothing: every prompt takes its default, and a required value left unset is a usage error naming the flag that supplies it. Output that isn't going to a terminal implies it, and so does `--json` |
 | `--no-color` | Print without colour. Setting `NO_COLOR` or `TERM=dumb` does the same, and colour is off whenever the output is not a terminal |
-| `--ascii` | Print with ASCII glyphs (`*`, `x`, `|-`, `->`, `>>`) in place of `✔`, `✘`, `├─`, `⟶`, and `»` |
+| `--ascii` | Print with ASCII glyphs (`*`, `x`, `|-`, `->`, `>>`) in place of `✔`, `✘`, `├─`, `→`, and `»` |
 | `--annotations` | Also print each error and warning to stderr as a GitHub Actions workflow command, `::error title=<headline> (<code>)::<item>` for each of an error's items (or `::error title=<code>::<headline>` for one without) and `::warning::<warning>`, which the runner shows as annotations on the run. On by default when `GITHUB_ACTIONS=true`. Works with `--json`, whose output stays on stdout |
 | `--no-annotations` | Print no GitHub Actions annotations, even when `GITHUB_ACTIONS=true` |
 

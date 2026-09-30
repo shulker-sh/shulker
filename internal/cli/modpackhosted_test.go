@@ -149,7 +149,7 @@ func TestHostedModpackUpdatesLikeAMod(t *testing.T) {
 	cozy := h.modrinthPacks["COZYpack"]
 	cozy.versions = append(cozy.versions, modrinthPackVersion{id: "cozyV200", number: "2.0.0", published: "2026-09-05T00:00:00Z", archive: next})
 
-	if got := h.mustRun(t, "outdated"); !strings.Contains(got, "cozy 1.0.0 ⟶ 2.0.0 (modpack)") {
+	if got := h.mustRun(t, "outdated"); !strings.Contains(got, "cozy 1.0.0 → 2.0.0 (modpack)") {
 		t.Fatalf("outdated reports the modpack:\n%s", got)
 	}
 	h.mustRun(t, "pin", "cozy")

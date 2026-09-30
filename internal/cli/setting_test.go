@@ -44,7 +44,7 @@ func TestSetGetUnset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if stdout := h.mustRun(t, "set", "server.properties.hardcore", "true"); stdout != "  ~ server.properties.hardcore (unset) ⟶ true\n" {
+	if stdout := h.mustRun(t, "set", "server.properties.hardcore", "true"); stdout != "  ~ server.properties.hardcore (unset) → true\n" {
 		t.Fatalf("set output = %q", stdout)
 	}
 	h.mustRun(t, "set", "server.properties.rcon.port", "25575")
@@ -255,7 +255,7 @@ func TestSetToTheSameValueSaysSo(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "set", "description", "cozy")
-	if stdout := h.mustRun(t, "set", "description", "cozy"); !strings.Contains(stdout, `description is already "cozy"`) || strings.Contains(stdout, "⟶") {
+	if stdout := h.mustRun(t, "set", "description", "cozy"); !strings.Contains(stdout, `description is already "cozy"`) || strings.Contains(stdout, "→") {
 		t.Fatalf("set to the same value: %s", stdout)
 	}
 }

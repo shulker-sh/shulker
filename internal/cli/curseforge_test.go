@@ -320,10 +320,10 @@ func TestCurseForgeSwitchAndAbsenceOutput(t *testing.T) {
 		t.Fatalf("add via curseforge: %s", stdout)
 	}
 	stdout = h.mustRun(t, "add", "sodium", "--provider", "modrinth")
-	if !strings.HasPrefix(stdout, "  ~ sodium ") || !strings.Contains(stdout, "curseforge ⟶ modrinth") {
+	if !strings.HasPrefix(stdout, "  ~ sodium ") || !strings.Contains(stdout, "curseforge → modrinth") {
 		t.Fatalf("switch back: %s", stdout)
 	}
-	if stdout = h.mustRun(t, "add", "sodium", "--provider", "curseforge"); !strings.Contains(stdout, "modrinth ⟶ curseforge") {
+	if stdout = h.mustRun(t, "add", "sodium", "--provider", "curseforge"); !strings.Contains(stdout, "modrinth → curseforge") {
 		t.Fatalf("second switch: %s", stdout)
 	}
 	if stdout = h.mustRun(t, "add", "sodium"); !strings.Contains(stdout, "sodium is already in the pack") {

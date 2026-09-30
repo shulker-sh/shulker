@@ -169,7 +169,7 @@ func (a *app) root() *cobra.Command {
 		return pflag.NormalizedName(name)
 	})
 	root.PersistentFlags().BoolVar(&a.style.NoColor, "no-color", false, "print without colour (NO_COLOR does the same).")
-	root.PersistentFlags().BoolVar(&a.style.ASCII, "ascii", false, "print with ASCII glyphs instead of ✔ ✘ ├─ ⟶ ».")
+	root.PersistentFlags().BoolVar(&a.style.ASCII, "ascii", false, "print with ASCII glyphs instead of ✔ ✘ ├─ → ».")
 	root.PersistentFlags().Bool("annotations", false, "also print errors and warnings as GitHub Actions annotations (the default when GITHUB_ACTIONS=true).")
 	root.PersistentFlags().Bool("no-annotations", false, "print no GitHub Actions annotations, even when GITHUB_ACTIONS=true.")
 	a.printer.JSON, a.printer.NoInput, a.style.NoColor, a.style.ASCII = jsonOut, noInput, noColor, ascii

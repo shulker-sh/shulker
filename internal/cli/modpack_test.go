@@ -346,7 +346,7 @@ func TestGitModpack(t *testing.T) {
 		t.Fatalf("build must stay on the locked commit: %q", got)
 	}
 	stdout = h.mustRun(t, "update", "shared-pack")
-	if !strings.Contains(stdout, "~ shared-pack "+first[:12]+" ⟶ "+second[:12]+" (modpack)") {
+	if !strings.Contains(stdout, "~ shared-pack "+first[:12]+" → "+second[:12]+" (modpack)") {
 		t.Fatalf("update output: %s", stdout)
 	}
 	h.mustRun(t, "build")

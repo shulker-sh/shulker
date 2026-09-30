@@ -35,7 +35,7 @@ func TestConfigCurseForgeKey(t *testing.T) {
 	t.Setenv("SHULKER_CURSEFORGE_KEY", "")
 	h := newHarness(t)
 
-	if stdout := h.mustRun(t, "config", "set", "curseforge.key", "abcd1234wxyz"); stdout != "  ~ curseforge.key (unset) ⟶ \"••••wxyz\"\n" {
+	if stdout := h.mustRun(t, "config", "set", "curseforge.key", "abcd1234wxyz"); stdout != "  ~ curseforge.key (unset) → \"••••wxyz\"\n" {
 		t.Fatalf("set output = %q", stdout)
 	}
 	info, err := os.Stat(h.config)
@@ -74,7 +74,7 @@ func TestConfigCurseForgeKey(t *testing.T) {
 	if err := os.WriteFile(h.config, data, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if stdout := h.mustRun(t, "config", "unset", "curseforge.key"); stdout != "  ~ curseforge.key \"••••wxyz\" ⟶ (unset)\n" {
+	if stdout := h.mustRun(t, "config", "unset", "curseforge.key"); stdout != "  ~ curseforge.key \"••••wxyz\" → (unset)\n" {
 		t.Errorf("unset output = %q", stdout)
 	}
 	if stdout := h.mustRun(t, "config", "unset", "curseforge.key"); stdout != "  i curseforge.key was not set.\n" {
@@ -116,7 +116,7 @@ func TestConfigRegistry(t *testing.T) {
 		t.Error("the refused set wrote config.json")
 	}
 
-	want := fmt.Sprintf("  ~ registry (unset) ⟶ %q\n  ✔ Created %s\n", moved, moved)
+	want := fmt.Sprintf("  ~ registry (unset) → %q\n  ✔ Created %s\n", moved, moved)
 	if stdout := h.mustRun(t, "config", "set", "registry", moved, "--force"); stdout != want {
 		t.Errorf("set --force output = %q, want %q", stdout, want)
 	}
@@ -159,7 +159,7 @@ func TestConfigUnsetRegistryCreatesDefault(t *testing.T) {
 	moved := filepath.Join(t.TempDir(), "registry.json")
 	h.mustRun(t, "config", "set", "registry", moved)
 
-	want := fmt.Sprintf("  ~ registry %q ⟶ (unset)\n  ✔ Created %s\n", moved, defaultRegistry)
+	want := fmt.Sprintf("  ~ registry %q → (unset)\n  ✔ Created %s\n", moved, defaultRegistry)
 	if stdout := h.mustRun(t, "config", "unset", "registry"); stdout != want {
 		t.Errorf("unset output = %q, want %q", stdout, want)
 	}

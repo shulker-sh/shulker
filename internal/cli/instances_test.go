@@ -696,7 +696,7 @@ func TestInstancesRepairFollowsARenameInTheLauncher(t *testing.T) {
 	}
 
 	rename("Friends Survival")
-	if stdout := h.mustRun(t, "instances", "repair"); !strings.Contains(stdout, "Renamed friends  Friends SMP ⟶ Friends Survival") {
+	if stdout := h.mustRun(t, "instances", "repair"); !strings.Contains(stdout, "Renamed friends  Friends SMP → Friends Survival") {
 		t.Fatalf("repair prints the rename: %s", stdout)
 	}
 

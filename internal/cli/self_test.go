@@ -122,7 +122,7 @@ func TestSelfUpdateReplacesBinary(t *testing.T) {
 	if got := h.binary(t); got != "new binary" {
 		t.Fatalf("binary holds %q", got)
 	}
-	if want := "  ✔ Updated shulker 0.0.1 ⟶ 0.0.2\n    ╰─ " + h.exe + "\n"; h.stdout.String() != want {
+	if want := "  ✔ Updated shulker 0.0.1 → 0.0.2\n    ╰─ " + h.exe + "\n"; h.stdout.String() != want {
 		t.Fatalf("stdout %q, want %q", &h.stdout, want)
 	}
 	for _, line := range []string{"Checksum verified", "GitHub CLI gh not found, skipping build provenance check"} {
@@ -193,7 +193,7 @@ func TestSelfUpdateCheckWorksOnEveryRoute(t *testing.T) {
 	if code := h.run("--check"); code != 0 {
 		t.Fatalf("exit %d: %s", code, &h.stdout)
 	}
-	if got := h.stdout.String(); !strings.Contains(got, "shulker 0.0.1 ⟶ 0.0.2 (update available)") || !strings.Contains(got, "Update it with:\n    $ go install shulker.sh/shulker@latest\n") {
+	if got := h.stdout.String(); !strings.Contains(got, "shulker 0.0.1 → 0.0.2 (update available)") || !strings.Contains(got, "Update it with:\n    $ go install shulker.sh/shulker@latest\n") {
 		t.Fatalf("go install --check: %q", got)
 	}
 

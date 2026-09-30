@@ -81,18 +81,18 @@ func TestProvidersAddAndRemovePrintTheListBeforeAndAfter(t *testing.T) {
 	prismAccounts(t, h, prismNotch)
 
 	stdout := h.mustRun(t, "accounts", "stores", "add", "prism")
-	if !strings.Contains(stdout, `accounts.stores ["shulker"] ⟶ ["shulker","prism"]`) {
+	if !strings.Contains(stdout, `accounts.stores ["shulker"] → ["shulker","prism"]`) {
 		t.Errorf("add should print the list before and after:\n%s", stdout)
 	}
 	if got := readConfigDoc(t, h.config)["accounts"].(map[string]any)["stores"]; len(got.([]any)) != 2 {
 		t.Errorf("accounts.stores = %v", got)
 	}
 	stdout = h.mustRun(t, "accounts", "stores", "remove", "shulker")
-	if !strings.Contains(stdout, `accounts.stores ["shulker","prism"] ⟶ ["prism"]`) {
+	if !strings.Contains(stdout, `accounts.stores ["shulker","prism"] → ["prism"]`) {
 		t.Errorf("remove should print the list before and after:\n%s", stdout)
 	}
 	stdout = h.mustRun(t, "accounts", "stores", "set", "shulker", "mojang")
-	if !strings.Contains(stdout, `accounts.stores ["prism"] ⟶ ["shulker","mojang"]`) {
+	if !strings.Contains(stdout, `accounts.stores ["prism"] → ["shulker","mojang"]`) {
 		t.Errorf("set should print the list before and after:\n%s", stdout)
 	}
 }

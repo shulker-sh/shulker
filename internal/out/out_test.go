@@ -137,7 +137,7 @@ func TestItemsCollapseNewlinesInText(t *testing.T) {
 		Item{Kind: Change, Name: "jei", From: "19.57\n", To: "\n19.58"},
 	)
 	got := buf.String()
-	if strings.Count(got, "\n") != 2 || !strings.Contains(got, "Refurbished Furniture 1.0.22") || !strings.Contains(got, "client only") || !strings.Contains(got, "19.57 ⟶ 19.58") {
+	if strings.Count(got, "\n") != 2 || !strings.Contains(got, "Refurbished Furniture 1.0.22") || !strings.Contains(got, "client only") || !strings.Contains(got, "19.57 → 19.58") {
 		t.Fatalf("items: %q", got)
 	}
 }

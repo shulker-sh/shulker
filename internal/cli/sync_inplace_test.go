@@ -77,7 +77,7 @@ func TestSyncInPlaceFollowsAutoUpdateModpacks(t *testing.T) {
 	followSecond := bumpPack(t, followRepo, "follow.txt")
 	heldSecond := bumpPack(t, heldRepo, "held.txt")
 	stdout := h.mustRun(t, "sync")
-	if !strings.Contains(stdout, "~ follow "+followFirst[:12]+" ⟶ "+followSecond[:12]+" (modpack)") || strings.Contains(stdout, "held") {
+	if !strings.Contains(stdout, "~ follow "+followFirst[:12]+" → "+followSecond[:12]+" (modpack)") || strings.Contains(stdout, "held") {
 		t.Fatalf("sync should move only the modpack that follows its source: %s", stdout)
 	}
 	if !strings.Contains(stdout, "Synced client") {
@@ -97,7 +97,7 @@ func TestSyncInPlaceFollowsAutoUpdateModpacks(t *testing.T) {
 	}
 
 	stdout = h.mustRun(t, "update")
-	if !strings.Contains(stdout, "~ held "+heldFirst[:12]+" ⟶ "+heldSecond[:12]+" (modpack)") || !strings.Contains(stdout, "Synced client") || strings.Contains(stdout, "shulker install") {
+	if !strings.Contains(stdout, "~ held "+heldFirst[:12]+" → "+heldSecond[:12]+" (modpack)") || !strings.Contains(stdout, "Synced client") || strings.Contains(stdout, "shulker install") {
 		t.Fatalf("update in an instance should move every modpack and build: %s", stdout)
 	}
 	if got := readInPlace(t, h, "config/held.txt"); got != "v2\n" {
@@ -234,10 +234,10 @@ func TestOutdatedChecksGitModpacks(t *testing.T) {
 		t.Fatalf("outdated before the pack moved: %s", stdout)
 	}
 	second := bumpPack(t, repo, "follow.txt")
-	if stdout := h.mustRun(t, "outdated"); !strings.Contains(stdout, "follow "+first[:12]+" ⟶ "+second[:12]+" (modpack)") {
+	if stdout := h.mustRun(t, "outdated"); !strings.Contains(stdout, "follow "+first[:12]+" → "+second[:12]+" (modpack)") {
 		t.Fatalf("outdated should see the new commit: %s", stdout)
 	}
-	if stdout := h.mustRun(t, "outdated", "follow"); !strings.Contains(stdout, "follow "+first[:12]+" ⟶ "+second[:12]) {
+	if stdout := h.mustRun(t, "outdated", "follow"); !strings.Contains(stdout, "follow "+first[:12]+" → "+second[:12]) {
 		t.Fatalf("outdated follow should see the new commit: %s", stdout)
 	}
 }

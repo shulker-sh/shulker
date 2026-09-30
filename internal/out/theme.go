@@ -196,7 +196,7 @@ func (t Theme) GlyphTee() string     { return t.glyph("├─", "|-") }
 // GlyphElbowRound closes a tree: the rounded corner under the last child.
 func (t Theme) GlyphElbowRound() string { return t.glyph("╰─", "\\-") }
 func (t Theme) GlyphBar() string        { return t.glyph("│", "|") }
-func (t Theme) ArrowBump() string       { return t.glyph("⟶", "->") }
+func (t Theme) ArrowBump() string       { return t.glyph("→", "->") }
 func (t Theme) ArrowInto() string       { return t.glyph("»", ">>") }
 func (t Theme) ArrowPick() string       { return t.glyph("‣", "*") }
 func (t Theme) Ellipsis() string        { return t.glyph("…", "...") }

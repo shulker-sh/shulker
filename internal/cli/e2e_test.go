@@ -1379,7 +1379,7 @@ func TestUpdateOutdatedAndPin(t *testing.T) {
 	if m.Mods["sodium"].Pin != "QANobbMI" {
 		t.Fatalf("manifest pin: %+v", m.Mods)
 	}
-	if out := h.mustRun(t, "outdated"); !strings.Contains(out, "sodium 1.0.0+mc26.2 ⟶ 1.1.0+mc26.2 (pinned)") {
+	if out := h.mustRun(t, "outdated"); !strings.Contains(out, "sodium 1.0.0+mc26.2 → 1.1.0+mc26.2 (pinned)") {
 		t.Fatalf("outdated with pin: %s", out)
 	}
 	if out := h.mustRun(t, "update"); !strings.Contains(out, "Already up to date") {
@@ -1495,7 +1495,7 @@ func TestDiffAndPull(t *testing.T) {
 	stdout = h.mustRun(t, "pull")
 	for _, line := range []string{
 		"Pulled client (1 file, 1 key written to shulker.json, 2 skipped)",
-		"pulled: config/plain.txt ⟶ overrides/config/plain.txt",
+		"pulled: config/plain.txt → overrides/config/plain.txt",
 		"set: options.txt joinedFirstServer=false",
 		"skipped: config/new.txt (not written by shulker; name it to adopt it)",
 		"skipped: config/tpl.txt (rendered from template overrides/config/tpl.txt.tmpl)",
@@ -1517,7 +1517,7 @@ func TestDiffAndPull(t *testing.T) {
 		t.Fatalf("pull of a file that isn't there should fail with file-not-found: %d %s", code, stderr)
 	}
 	stdout = h.mustRun(t, "pull", "config/new.txt")
-	if !strings.Contains(stdout, "pulled: config/new.txt ⟶ overrides/config/new.txt") {
+	if !strings.Contains(stdout, "pulled: config/new.txt → overrides/config/new.txt") {
 		t.Fatalf("named untracked file should be adopted: %s", stdout)
 	}
 	if data, _ := os.ReadFile(filepath.Join(overrides, "new.txt")); string(data) != "hand\n" {
