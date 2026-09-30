@@ -45,7 +45,7 @@ var atlauncherEntry = &Entry{
 	relink: relinkLauncher, forget: forgetInstance, name: atlauncherName, gameDirs: atlauncherGameDirs,
 	readSlots: readATLauncherSlots, writeSlots: writeATLauncherSlots, slotFile: instanceFileIn(ATLauncherInstanceFile),
 	place: placeATLauncher, link: linkATLauncher,
-	Accounts: atlauncherAccounts,
+	Accounts: atlauncherAccounts, WindowsAppData: "ATLauncher",
 	after: func(e *Entry, _ InstanceResult) string {
 		return "restart " + e.Title + " if it is open so the instance shows up"
 	},

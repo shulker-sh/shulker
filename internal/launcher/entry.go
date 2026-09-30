@@ -86,13 +86,16 @@ type Entry struct {
 	NeedsRuntime bool
 	// Accounts reads the accounts the launcher keeps in its data directory. Nil means it keeps
 	// none shulker can read.
-	Accounts   func(e *Entry, dir string, now time.Time) ([]account.Resolved, []error)
-	relink     func(e *Entry, l Linked) (args []string, in string)
-	forget     func(e *Entry, l config.Instance) (Forgotten, error)
-	name       func(e *Entry, launcherDir, gameDir string) string
-	gameDirs   func(e *Entry, launcherDir string) []string
-	readSlots  func(e *Entry, in config.Instance) (Slots, bool, error)
-	writeSlots func(e *Entry, in config.Instance, s Slots) error
+	Accounts func(e *Entry, dir string, now time.Time) ([]account.Resolved, []error)
+	// WindowsAppData is the launcher's accounts folder under the Windows %APPDATA%, which a WSL
+	// user's Windows launcher keeps.
+	WindowsAppData string
+	relink         func(e *Entry, l Linked) (args []string, in string)
+	forget         func(e *Entry, l config.Instance) (Forgotten, error)
+	name           func(e *Entry, launcherDir, gameDir string) string
+	gameDirs       func(e *Entry, launcherDir string) []string
+	readSlots      func(e *Entry, in config.Instance) (Slots, bool, error)
+	writeSlots     func(e *Entry, in config.Instance, s Slots) error
 	// slotFile is the launcher file holding an instance's slots, for a message about them.
 	slotFile func(e *Entry, in config.Instance) string
 	// locate settles the launcher directory a link works in, for a launcher that reaches its own
@@ -251,7 +254,13 @@ func (e *Entry) AccountsDir(instances []config.Instance) string {
 			return in.LauncherDir
 		}
 	}
-	return e.defaultDir()
+	dir := e.defaultDir()
+	if _, err := os.Stat(dir); dir == "" || err != nil {
+		if windows := e.wslAccountsDir(); windows != "" {
+			return windows
+		}
+	}
+	return dir
 }
 
 // HasDir says whether the launcher has a directory of its own, which a link records and

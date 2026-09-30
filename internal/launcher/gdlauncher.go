@@ -60,7 +60,7 @@ var gdlauncherEntry = &Entry{
 	readSlots: readGDLauncherSlots, writeSlots: writeGDLauncherSlots, slotFile: instanceFileIn(GDLauncherInstanceFile),
 	locate: filepath.EvalSymlinks, running: GDLauncherRunning,
 	place: placeGDLauncher, link: linkGDLauncher, after: gdlauncherAfter,
-	Accounts: gdlauncherAccounts,
+	Accounts: gdlauncherAccounts, WindowsAppData: filepath.Join("gdlauncher_carbon", "data"),
 }
 
 type GDLauncher struct {

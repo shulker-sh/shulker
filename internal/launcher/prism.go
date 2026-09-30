@@ -32,8 +32,8 @@ var prismEntry = &Entry{
 		Names: true,
 		Force: "repoint the modpack an instance already follows.",
 	},
-	Accounts: prismAccounts,
-	relink:   relinkLauncher, forget: forgetInstance, name: prismName, gameDirs: prismGameDirs,
+	Accounts: prismAccounts, WindowsAppData: "PrismLauncher",
+	relink: relinkLauncher, forget: forgetInstance, name: prismName, gameDirs: prismGameDirs,
 	readSlots: readPrismSlots, writeSlots: writePrismSlots, slotFile: instanceFileIn(PrismInstanceFile),
 	place: placePrism, link: linkPrism, after: restartIfUpdated,
 }

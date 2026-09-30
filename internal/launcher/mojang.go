@@ -45,8 +45,8 @@ var mojangEntry = &Entry{
 		Names:   true,
 		Force:   "repoint the modpack a profile already follows.",
 	},
-	Accounts: mojangAccounts,
-	relink:   relinkLauncher, forget: forgetMojang, name: mojangName, gameDirs: mojangGameDirs,
+	Accounts: mojangAccounts, WindowsAppData: ".minecraft",
+	relink: relinkLauncher, forget: forgetMojang, name: mojangName, gameDirs: mojangGameDirs,
 	readSlots: readMojangSlots, writeSlots: writeMojangSlots, slotFile: mojangSlotFile,
 	place: placeMojang, link: linkMojang,
 }
