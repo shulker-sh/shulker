@@ -30,8 +30,9 @@ type DownloadWait struct {
 	Check func() ([]WaitFile, error)
 	Every time.Duration
 	// Paste takes what was pasted or dragged into the terminal as paths to the files, and says
-	// where each file stands after, with a note on what it couldn't take. It runs off the loop.
-	Paste func(text string) ([]WaitFile, string, error)
+	// where each file stands after, with a note per path on what it couldn't take. It runs off the
+	// loop.
+	Paste func(text string) ([]WaitFile, []string, error)
 }
 
 // AwaitDownloads draws w until every file is found, or esc skips the rest, which reports skipped.
@@ -64,7 +65,7 @@ type waitCheckedMsg struct {
 
 type waitPastedMsg struct {
 	files []WaitFile
-	note  string
+	notes []string
 	err   error
 }
 
@@ -75,7 +76,8 @@ type waiter struct {
 	// asked is when enter asked for a check whose "Checking…" still shows; zero when none does.
 	asked   time.Time
 	hold    time.Duration
-	note    string
+	notes   []string
+	width   int
 	done    bool
 	skipped bool
 	err     error
@@ -107,12 +109,14 @@ func (m *waiter) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
 	case tea.PasteMsg:
 		if m.w.Paste != nil {
 			text := msg.Content
 			return m, func() tea.Msg {
-				files, note, err := m.w.Paste(text)
-				return waitPastedMsg{files, note, err}
+				files, notes, err := m.w.Paste(text)
+				return waitPastedMsg{files, notes, err}
 			}
 		}
 	case tea.KeyPressMsg:
@@ -144,7 +148,7 @@ func (m *waiter) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.asked = time.Time{}
 		}
 	case waitPastedMsg:
-		m.note = msg.note
+		m.notes = msg.notes
 		return m.update(msg.files, msg.err)
 	}
 	return m, nil
@@ -189,7 +193,7 @@ func (m *waiter) allFound() bool {
 func (m *waiter) View() tea.View {
 	t := m.theme
 	var b strings.Builder
-	l := &Lines{W: &b, T: t}
+	l := &Lines{W: &b, T: t, Width: m.width}
 	l.Warn(m.w.Title)
 	for _, f := range m.w.Files {
 		mark := t.Grey(t.GlyphPending())
@@ -205,9 +209,11 @@ func (m *waiter) View() tea.View {
 	if m.done {
 		return tea.NewView(b.String())
 	}
-	if m.note != "" {
+	if len(m.notes) > 0 {
 		l.Blank()
-		l.Warn(m.note)
+	}
+	for _, note := range m.notes {
+		l.Warn(note)
 	}
 	l.Blank()
 	if !m.asked.IsZero() {

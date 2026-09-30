@@ -55,7 +55,7 @@ func TestInstallWaitsForAManualDownloadAtATerminal(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("install after the file arrives: code=%d stdout=%s stderr=%s", code, stdout, stderr)
 	}
-	if !strings.Contains(stderr, "1 file needs a manual download into "+downloads) || !strings.Contains(stderr, "nodist-1.0.0.jar") || !strings.Contains(stderr, "https://www.curseforge.com") {
+	if !strings.Contains(stderr, "1 file needs a manual download into") || !strings.Contains(stderr, downloads) || !strings.Contains(stderr, "nodist-1.0.0.jar") || !strings.Contains(stderr, "https://www.curseforge.com") {
 		t.Fatalf("the wait names each file and its page: %s", stderr)
 	}
 	if !strings.Contains(stdout, "Built client") {
@@ -201,7 +201,7 @@ func TestAddWaitsForAManualDownloadAtATerminal(t *testing.T) {
 		os.WriteFile(filepath.Join(downloads, "nodist.jar"), h.jars["nodist"].data, 0o644)
 	}, "\r")
 	code, stdout, stderr := h.run(t, "add", "nodist")
-	if code != 0 || !strings.Contains(stderr, "1 file needs a manual download into "+downloads) || !strings.Contains(stderr, "nodist-1.0.0.jar") {
+	if code != 0 || !strings.Contains(stderr, "1 file needs a manual download into") || !strings.Contains(stderr, downloads) || !strings.Contains(stderr, "nodist-1.0.0.jar") {
 		t.Fatalf("add waits for the file and goes on: code=%d stdout=%s stderr=%s", code, stdout, stderr)
 	}
 	if _, l := readProject(t, h.dir); l.Mods["nodist"].Sha512 != h.jars["nodist"].sha512 {

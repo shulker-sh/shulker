@@ -219,26 +219,27 @@ func (w *Wait) checkWatched(dir string) error {
 }
 
 // Take hashes the files at the paths pasted or dragged into the terminal against the files still
-// missing and lands each match as a watched-folder find is landed. The note says what was pasted
-// that is none of them.
-func (w *Wait) Take(text string) ([]Status, string, error) {
+// missing and lands each match as a watched-folder find is landed. The notes say, one per path,
+// what was pasted that is none of them.
+func (w *Wait) Take(text string) ([]Status, []string, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	var notes []string
 	for _, path := range pastedPaths(text) {
+		name := filepath.Base(path)
 		st, err := os.Stat(path)
 		if err != nil || !st.Mode().IsRegular() {
-			notes = append(notes, path+" isn't a file")
+			notes = append(notes, name+" isn't a file.")
 			continue
 		}
 		h, err := w.hash(path)
 		if err != nil {
-			notes = append(notes, fmt.Sprintf("%s can't be read: %v", path, err))
+			notes = append(notes, out.Period(fmt.Sprintf("%s can't be read: %v", name, err)))
 			continue
 		}
 		i := slices.IndexFunc(w.files, func(f File) bool { return f.matches(h) })
 		if i < 0 {
-			notes = append(notes, path+" isn't one of the files")
+			notes = append(notes, name+" isn't one of the "+w.noun()+" above.")
 			continue
 		}
 		if w.status[i].Found {
@@ -246,11 +247,21 @@ func (w *Wait) Take(text string) ([]Status, string, error) {
 		}
 		c := candidate{path: path, name: filepath.Base(path), modTime: st.ModTime(), arrived: st.ModTime().After(w.started)}
 		if err := w.take(c, w.files[i]); err != nil {
-			return nil, "", err
+			return nil, nil, err
 		}
 		w.status[i] = Status{Found: true}
 	}
-	return slices.Clone(w.status), out.Period(strings.Join(notes, "; ")), nil
+	return slices.Clone(w.status), notes, nil
+}
+
+// noun names what the wait lists: mods when every file is a jar, else files.
+func (w *Wait) noun() string {
+	for _, f := range w.files {
+		if !strings.HasSuffix(f.Name, ".jar") {
+			return "files"
+		}
+	}
+	return "mods"
 }
 
 // pastedPaths reads the paths in text the way a terminal writes a dropped file: separated by

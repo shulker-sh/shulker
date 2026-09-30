@@ -125,16 +125,18 @@ func TestWaitChecksOnceAtATime(t *testing.T) {
 func TestWaitTakesAPastedPath(t *testing.T) {
 	m := newTestWait(&fakeChecks{answers: [][]bool{{false, false}}})
 	var pasted []string
-	m.w.Paste = func(text string) ([]WaitFile, string, error) {
+	m.w.Paste = func(text string) ([]WaitFile, []string, error) {
 		pasted = append(pasted, text)
-		if text == "/tmp/nope.jar" {
-			return []WaitFile{{}, {}}, "/tmp/nope.jar isn't one of the files", nil
+		if text == "/tmp/nope.jar /tmp/other.jar" {
+			return []WaitFile{{}, {}}, []string{"nope.jar isn't one of the mods above.", "other.jar isn't one of the mods above."}, nil
 		}
-		return []WaitFile{{Found: true}, {Found: true}}, "", nil
+		return []WaitFile{{Found: true}, {Found: true}}, nil, nil
 	}
-	run(m, tea.PasteMsg{Content: "/tmp/nope.jar"})
-	if view := m.View().Content; m.done || !strings.Contains(view, "/tmp/nope.jar isn't one of the files") {
-		t.Fatalf("a paste that matches nothing is noted:\n%s", view)
+	run(m, tea.WindowSizeMsg{Width: 30})
+	run(m, tea.PasteMsg{Content: "/tmp/nope.jar /tmp/other.jar"})
+	view := m.View().Content
+	if m.done || !strings.Contains(view, "! nope.jar isn't one of the\n") || !strings.Contains(view, "! other.jar isn't one of the\n") {
+		t.Fatalf("each path that matches nothing gets its own note, wrapped to the terminal:\n%s", view)
 	}
 	run(m, keyPress("x"))
 	run(m, tea.PasteMsg{Content: "/tmp/a.jar /tmp/b.jar"})

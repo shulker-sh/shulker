@@ -71,9 +71,9 @@ func (a *app) awaitDownloads(ctx context.Context, downloads string, e *out.Error
 			return waitFiles(downloads, status), err
 		},
 		Every: downloadCheckEvery,
-		Paste: func(text string) ([]out.WaitFile, string, error) {
-			status, note, err := w.Take(text)
-			return waitFiles(downloads, status), note, err
+		Paste: func(text string) ([]out.WaitFile, []string, error) {
+			status, notes, err := w.Take(text)
+			return waitFiles(downloads, status), notes, err
 		},
 	}, a.stdin)
 	return skip, escaped(err)

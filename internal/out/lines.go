@@ -19,6 +19,9 @@ const gutter = "  "
 type Lines struct {
 	W io.Writer
 	T Theme
+	// Width is the terminal width prose wraps to when W is a buffer a view draws into rather than
+	// the terminal itself; zero leaves it to W.
+	Width int
 }
 
 // Kind is the gutter glyph an Item carries.

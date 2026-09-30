@@ -18,7 +18,9 @@ func (l *Lines) prose(glyph, text string) {
 		lead = glyph + " "
 	}
 	limit := 0
-	if IsTerminal(unwrap(l.W)) {
+	if l.Width > 0 {
+		limit = min(l.Width, proseColumns) - len(gutter) - Width(lead)
+	} else if IsTerminal(unwrap(l.W)) {
 		limit = min(TerminalWidth(l.W), proseColumns) - len(gutter) - Width(lead)
 	}
 	indent := strings.Repeat(" ", Width(lead))
