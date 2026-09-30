@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
-	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -373,30 +372,65 @@ func pinnedSodium(t *testing.T) *harness {
 	return newHarness(t, host)
 }
 
-func TestKeepingAModThisCommandLockedIsSilent(t *testing.T) {
-	h := pinnedSodium(t)
+func TestOneCommandLocksTheVersionADependentAsksFor(t *testing.T) {
+	for _, order := range [][]string{{"sodium", "iris"}, {"iris", "sodium"}} {
+		h := pinnedSodium(t)
 
-	h.mustAdd("sodium", AddOptions{})
-	h.mustAdd("iris", AddOptions{})
+		for _, slug := range order {
+			h.mustAdd(slug, AddOptions{})
+		}
 
-	if len(h.notes) > 0 {
-		t.Fatalf("sodium was locked by this command, so keeping it says nothing: %+v", h.notes)
-	}
-	if got := h.mod("sodium").VersionNumber; got != "0.9.3" {
-		t.Fatalf("sodium = %s, want 0.9.3 kept", got)
+		if got := h.mod("sodium"); got.VersionNumber != "0.9.2" || !slices.Contains(got.RequiredBy, "iris") {
+			t.Fatalf("add %v: iris asks for sodium 0.9.2, so the command locks it: %+v", order, got)
+		}
+		if len(h.notes) > 0 || len(h.r.Warnings) > 0 {
+			t.Fatalf("add %v: settling on the version iris asks for says nothing: %+v %q", order, h.notes, h.r.Warnings)
+		}
 	}
 }
 
-func TestKeepingAModLockedBeforeTheCommandSaysSo(t *testing.T) {
+func TestAnExactVersionAskedOfAHeldModWarns(t *testing.T) {
 	h := pinnedSodium(t)
 	h.mustAdd("sodium", AddOptions{})
 
 	h.nextCommand()
 	h.mustAdd("iris", AddOptions{})
 
-	want := out.Item{Kind: out.Note, Name: "sodium", Version: "0.9.3", Text: "already in the pack", Aside: []string{"required by iris"}}
-	if len(h.notes) != 1 || !reflect.DeepEqual(h.notes[0], want) {
-		t.Fatalf("sodium was locked before this command, so keeping it is noted: %+v", h.notes)
+	if got := h.mod("sodium").VersionNumber; got != "0.9.3" {
+		t.Fatalf("sodium was in the pack before, so it stays: %s", got)
+	}
+	want := "iris 1.0.0 asks for sodium 0.9.2, but the pack keeps 0.9.3; `shulker pin sodium s-092` locks it, or add with --with-deps."
+	if len(h.r.Warnings) != 1 || h.r.Warnings[0] != want || len(h.notes) > 0 {
+		t.Fatalf("warnings %q, notes %+v", h.r.Warnings, h.notes)
+	}
+}
+
+func TestWithDepsMovesAHeldModToTheExactVersionAskedFor(t *testing.T) {
+	h := pinnedSodium(t)
+	h.mustAdd("sodium", AddOptions{})
+
+	h.nextCommand()
+	h.mustAdd("iris", AddOptions{WithDeps: true})
+
+	if got := h.mod("sodium"); got.VersionNumber != "0.9.2" || !slices.Contains(got.RequiredBy, "iris") {
+		t.Fatalf("--with-deps moves sodium to the version iris asks for: %+v", got)
+	}
+	if len(h.r.Warnings) > 0 {
+		t.Fatalf("warnings %q", h.r.Warnings)
+	}
+}
+
+func TestAPinnedModKeepsItsVersionOverAnExactAsk(t *testing.T) {
+	h := pinnedSodium(t)
+
+	h.mustAdd("sodium", AddOptions{Pin: "s-093"})
+	h.mustAdd("iris", AddOptions{WithDeps: true})
+
+	if got := h.mod("sodium").VersionNumber; got != "0.9.3" {
+		t.Fatalf("a pin is the user's own choice: %s", got)
+	}
+	if len(h.r.Warnings) != 1 || !strings.Contains(h.r.Warnings[0], "iris 1.0.0 asks for sodium 0.9.2, but sodium is pinned to 0.9.3") {
+		t.Fatalf("warnings %q", h.r.Warnings)
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 // addAsking is r.Add with the two refusals a terminal can answer turned into questions: which
 // loader a project with none should use, and whether to move a version the lock holds.
 func (a *app) addAsking(ctx context.Context, r *resolve.Resolver, slug string, opts resolve.AddOptions) error {
+	opts.WithDeps = opts.WithDeps || a.yes
 	if !a.asksYes() {
 		return r.Add(ctx, slug, opts)
 	}

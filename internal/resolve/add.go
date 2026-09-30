@@ -89,6 +89,10 @@ type Resolver struct {
 	adopted []string
 	// locked are the mods this resolver locked, which keeping one again doesn't report.
 	locked map[string]bool
+	// exact are the versions, by key, that a mod this command added asked for by version id.
+	exact map[string]exactAsk
+	// withDeps moves a mod the lock held to the version a mod being added asks for by id.
+	withDeps bool
 	// SkipPending goes on without the files waiting for a manual download rather than naming them
 	// as missing: install leaves out the mods pending in the lock, and an import locks the mods it
 	// can't download pending. A build leaves pending mods out.
@@ -377,6 +381,7 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 		return loaderRequired()
 	}
 	held := holdVersions(r.Lock)
+	r.withDeps = opts.WithDeps
 	v, err := r.pickVersion(ctx, opts.As, p, proj, r.queryFor(manifest.TypeMod, p.Name()), opts.Pin, opts.Channel)
 	if err != nil {
 		return err
@@ -890,9 +895,14 @@ func (r *Resolver) addDeps(ctx context.Context, p provider.Provider, v *provider
 			continue
 		}
 		visited[d.ProjectID] = true
-		if locked, ok := r.lockedProject(p.Name(), d.ProjectID); ok && dv == nil {
-			r.Lock.AddRequiredBy(locked, parentID)
-			continue
+		var movedFrom []string
+		if locked, ok := r.lockedProject(p.Name(), d.ProjectID); ok {
+			if dv == nil || !r.movesToExact(p, locked, parentID, v, dv) {
+				r.Lock.AddRequiredBy(locked, parentID)
+				continue
+			}
+			movedFrom = r.Lock.Mods[locked].RequiredBy
+			r.dropLocked(locked)
 		}
 		dproj, err := p.Project(ctx, d.ProjectID, "")
 		if err != nil {
@@ -907,6 +917,9 @@ func (r *Resolver) addDeps(ctx context.Context, p provider.Provider, v *provider
 		id, _, err := r.place(ctx, p, dproj, dv, "", parentID, "", channel, false)
 		if err != nil {
 			return err
+		}
+		for _, by := range movedFrom {
+			r.Lock.AddRequiredBy(id, by)
 		}
 		if err := r.addDeps(ctx, p, dv, id, channel, visited); err != nil {
 			return err

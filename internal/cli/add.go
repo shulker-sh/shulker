@@ -174,7 +174,7 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 		cmd.Flags().BoolVar(&noAutoUpdate, "no-auto-update", false, "keep the modpack at its locked version on `shulker sync`; `shulker update` still moves it.")
 	}
 	if applies(kind, "with-deps") {
-		cmd.Flags().BoolVar(&opts.WithDeps, "with-deps", false, "move dependency versions the lock holds when a mod being added needs another.")
+		cmd.Flags().BoolVar(&opts.WithDeps, "with-deps", false, "move dependency versions the lock holds when a mod being added needs another, or asks for one by version id.")
 	}
 	a.registerEveryFetch(cmd)
 	if applies(kind, "yes") {
