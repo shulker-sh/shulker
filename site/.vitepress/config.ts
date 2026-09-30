@@ -93,6 +93,7 @@ export default defineConfig({
                         { text: 'Getting Started', link: '/docs/getting-started' },
                         { text: 'Concepts', link: '/docs/concepts' },
                         { text: 'GitHub Actions', link: '/docs/github-actions' },
+                        { text: 'Security', link: '/docs/security' },
                         { text: 'About', link: '/docs/about' },
                     ],
                 },

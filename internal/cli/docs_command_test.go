@@ -26,7 +26,7 @@ func docsJSON(t *testing.T, wantExit int, args ...string) map[string]any {
 
 func TestDocsIndexListsPages(t *testing.T) {
 	pages := docsJSON(t, out.ExitOK)["pages"].([]any)
-	if len(pages) != 5 || pages[0].(map[string]any)["name"] != "getting-started" {
+	if len(pages) != 6 || pages[0].(map[string]any)["name"] != "getting-started" {
 		t.Fatalf("pages %v", pages)
 	}
 	code, stdout, _ := run(t, "docs")
@@ -81,7 +81,7 @@ func TestDocsSearch(t *testing.T) {
 
 func TestDocsTopicNotFound(t *testing.T) {
 	data := docsJSON(t, out.ExitError, "qqqq-nothing")
-	if data["code"] != "topic-not-found" || len(data["candidates"].([]string)) != 5 {
+	if data["code"] != "topic-not-found" || len(data["candidates"].([]string)) != 6 {
 		t.Fatalf("data %v", data)
 	}
 }
