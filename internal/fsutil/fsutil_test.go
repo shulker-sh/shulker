@@ -212,3 +212,37 @@ func TestReadTailKeepsTheLastLinesWhole(t *testing.T) {
 		t.Fatalf("no limit is the whole file: %v", err)
 	}
 }
+
+func TestMakeDirUndoesOnlyWhatItMade(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "packs", "new")
+	undo, err := MakeDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(dir); err != nil {
+		t.Fatal(err)
+	}
+	undo()
+	if _, err := os.Stat(filepath.Join(root, "packs")); !os.IsNotExist(err) {
+		t.Fatalf("packs/ should be gone: %v", err)
+	}
+	if _, err := os.Stat(root); err != nil {
+		t.Fatalf("the folder that was already there should stay: %v", err)
+	}
+
+	undo, err = MakeDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "packs", "kept.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	undo()
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatalf("the empty folder should be gone: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "packs", "kept.txt")); err != nil {
+		t.Fatalf("a folder that holds something should stay: %v", err)
+	}
+}

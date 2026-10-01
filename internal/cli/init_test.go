@@ -112,6 +112,15 @@ func TestLoaderFlagsStandInForLoader(t *testing.T) {
 	}
 }
 
+func TestCreateMakesAFolderThatIsntThereYet(t *testing.T) {
+	h := newHarness(t)
+	dir := filepath.Join(t.TempDir(), "packs", "new")
+	h.mustRun(t, "create", "--fabric", "--json", "-C", dir)
+	if _, err := os.Stat(filepath.Join(dir, manifest.FileName)); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestSideFlagsStandInForSide(t *testing.T) {
 	h := newHarness(t)
 	for _, cmd := range []string{"create", "init"} {

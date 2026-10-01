@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
@@ -186,12 +187,18 @@ func (a *app) createProject(cmd *cobra.Command, dir string, opts *initOptions) e
 	if m.Minecraft == "*" {
 		m.Minecraft = l.Minecraft
 	}
+	undoDir, err := fsutil.MakeDir(dir)
+	if err != nil {
+		return err
+	}
 	p := &project.Project{Dir: dir, Manifest: m, Lock: l}
 	if err := p.SaveManifest(); err != nil {
+		undoDir()
 		return err
 	}
 	if err := p.SaveLock(); err != nil {
 		os.Remove(filepath.Join(dir, manifest.FileName))
+		undoDir()
 		return err
 	}
 	if err := project.Scaffold(dir); err != nil {

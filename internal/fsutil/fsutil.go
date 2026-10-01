@@ -147,6 +147,30 @@ func tempName(path string) (string, error) {
 	return filepath.Join(filepath.Dir(path), "."+filepath.Base(path)+"."+hex.EncodeToString(b)+".tmp"), nil
 }
 
+// MakeDir makes dir and any missing parents. undo removes the folders it made, deepest first,
+// stopping at the first one that is no longer empty.
+func MakeDir(dir string) (undo func(), err error) {
+	var made []string
+	for d := filepath.Clean(dir); ; d = filepath.Dir(d) {
+		if _, err := os.Stat(d); !errors.Is(err, fs.ErrNotExist) || filepath.Dir(d) == d {
+			break
+		}
+		made = append(made, d)
+	}
+	undo = func() {
+		for _, d := range made {
+			if os.Remove(d) != nil {
+				return
+			}
+		}
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		undo()
+		return func() {}, err
+	}
+	return undo, nil
+}
+
 // Replace writes data to path after moving whatever is there aside. The new
 // file keeps the old one's mode.
 func Replace(path string, data []byte) (kept string, err error) {
