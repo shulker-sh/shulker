@@ -13,7 +13,7 @@ This page is for both. An agent can read it offline with `shulker docs security`
 
 [`shulker security`](/docs/cli#shulker-security) lists every protection and whether it's on. No project or source can turn off one that has no setting.
 
-| Protection | What it does |
+| Protection | What It Does |
 | --- | --- |
 | `paths` | No path in a pack, lock or manifest can reach outside its folder or into shulker's own files for an instance, so a pack can't write over files elsewhere on your machine or change how the game is started. |
 | `override-symlinks` | Symlinks in a source's override folders are skipped, so one can't copy a file from elsewhere on your disk, like an SSH key, into an instance. |
@@ -90,7 +90,7 @@ A release candidate, such as `0.0.1-rc.1`, is never installed unless you ask for
 
 Each of these only reads, apart from `shulker cache verify --fix`, and prints one JSON object with `--json`. The `audit` commands take `-C` for a project directory or `-i` for a registered instance. None needs an MCP server; a shell is enough.
 
-| Command | What it returns in `--json` |
+| Command | What It Returns in `--json` |
 | --- | --- |
 | [`shulker security`](/docs/cli#shulker-security) | `stance`, and `protections`, each with `id`, `summary`, `on`, and `setting`, `value` and `changes` when configurable. |
 | [`shulker audit [key...]`](/docs/cli#shulker-audit) | One list per check: `takedowns`, `moved`, `skipped`, `provenance`, `unpublished`, `installed` and `young`. It fails with `audit-failed` for takedowns and provenance problems. |
@@ -101,7 +101,7 @@ Each of these only reads, apart from `shulker cache verify --fix`, and prints on
 | [`shulker audit file <entry> <path>`](/docs/cli#shulker-audit-file) | One non-class file from inside a jar, such as `fabric.mod.json`, as `content`. |
 | [`shulker cache verify`](/docs/cli#shulker-cache-verify) | `changed` cache objects, `takedowns` and `moved` files across every instance and history entry, and `unused` objects. It fails with `cache-verify-failed`. |
 
-An `<entry>` is a lock entry's key or a path to a jar, so a file can be inspected before it's added. The [CLI reference](/docs/cli) lists every field.
+An `<entry>` is a lock entry's key or a path to a jar, so a file can be inspected before it's added. The [CLI Reference](/docs/cli) lists every field.
 
 ## A Suggested Order
 

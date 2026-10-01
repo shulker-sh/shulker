@@ -103,20 +103,20 @@ outline: [2, 3]
 | [`shulker completion fish`](#shulker-completion-fish) | Print the fish completion script |
 | [`shulker completion powershell`](#shulker-completion-powershell) | Print the PowerShell completion script |
 
-## Global flags
+## Global Flags
 
 These work with every command.
 
 | Flag | Description |
 | --- | --- |
-| `--json` | Print machine-readable JSON, including errors; see [JSON output](#json-output) |
+| `--json` | Print machine-readable JSON, including errors; see [JSON Output](#json-output) |
 | `--no-input` | Ask nothing: every prompt takes its default, and a required value left unset is a usage error naming the flag that supplies it. Output that isn't going to a terminal implies it, and so does `--json` |
 | `--no-color` | Print without colour. Setting `NO_COLOR` or `TERM=dumb` does the same, and colour is off whenever the output is not a terminal |
 | `--ascii` | Print with ASCII glyphs (`*`, `x`, `|-`, `->`, `>>`) in place of `✔`, `✘`, `├─`, `→`, and `»` |
 | `--annotations` | Also print each error and warning to stderr as a GitHub Actions workflow command, `::error title=<headline> (<code>)::<item>` for each of an error's items (or `::error title=<code>::<headline>` for one without) and `::warning::<warning>`, which the runner shows as annotations on the run. On by default when `GITHUB_ACTIONS=true`. Works with `--json`, whose output stays on stdout |
 | `--no-annotations` | Print no GitHub Actions annotations, even when `GITHUB_ACTIONS=true` |
 
-## Project and instance flags
+## Project and Instance Flags
 
 These say which directory a command acts on, so only the commands that act on one take them. Anywhere else they are an unknown flag.
 
@@ -936,7 +936,7 @@ shulker rollback --prune
 | --- | --- |
 | `--prune` | Also trim history to the number the manifest keeps |
 
-## Accounts and sign-in
+## Accounts and Sign-In
 
 ### `shulker accounts`
 
@@ -2037,7 +2037,7 @@ shulker completion powershell | Out-String | Invoke-Expression
 | --- | --- |
 | `--no-descriptions` | Leave command descriptions out of the completions |
 
-## JSON output
+## JSON Output
 
 With `--json`, every command prints one JSON object on stdout, whether it succeeds or fails:
 
@@ -2064,7 +2064,7 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 
 `help` says what to do about the error, like the command to run. `candidates` lists values you could pass instead, like the sides when a command is given something that is not one. `items` lists what the error is about, like the files in conflict. All three are left out when empty. `protection` is set only when a security protection refused something: it is the `id` of that protection's row in [`shulker security --json`](#shulker-security), so `mrpack-invalid` from a pack that tried to write outside its folder (`paths`) reads apart from one that is only malformed.
 
-| Exit status | Meaning |
+| Exit Status | Meaning |
 | --- | --- |
 | `0` | Success |
 | `1` | Failure; `error.code` says which |
@@ -2091,7 +2091,7 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 | `examples` | Example command lines |
 | `docs` | The command's page on this site |
 
-### Lock changes
+### Lock Changes
 
 `lock`, `add`, `remove`, `update`, `pin`, `unpin`, `modpack add`, and `modpack remove` all return the same `data`: what changed in `shulker.lock` and `shulker.json`.
 
@@ -2118,7 +2118,7 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 | `suggestions` | Recommended mods that aren't installed |
 | `pin` | `pin` only: the version it pinned to |
 
-### Error codes
+### Error Codes
 
 Without `--json`, the error line ends with its code, like `✘ sodium is not in the manifest (mod-not-found)`, with the items and candidates in a tree underneath.
 

@@ -35,7 +35,7 @@ Some files are generated instead of copied. `server.properties`, `options.txt`, 
 
 Files ending in `.tmpl` have `${name}` replaced with the side's [`variables`](/docs/manifest#variables) and are written without the suffix. `server.properties` and `client.options` values in the manifest expand the same variables. The built-in variables are always there as well.
 
-| Variable | Comes from |
+| Variable | Comes From |
 | --- | --- |
 | `${project.name}`, `${project.displayName}`, `${project.version}` | The manifest of the project that owns the folder, so a pulled pack's files get that pack's own. `${project.displayName}` is the side's `name`, or the project's when the side has none. An export given `--version` uses it for the project's own `${project.version}` |
 | `${minecraft.version}`, `${minecraft.dataVersion}` | The lock. `${minecraft.dataVersion}` is the number Minecraft stamps into worlds and `options.txt` |

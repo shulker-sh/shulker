@@ -6,7 +6,7 @@ description: Check a Shulker modpack on every push, and export it and publish a 
 
 Check a modpack on every push, and release it from its repository: push a tag like `v1.2.0`, and a workflow exports the Modrinth and CurseForge archives and attaches them to a GitHub release.
 
-## Check on push
+## Check on Push
 
 Catch a broken pack before anyone plays it: run [`shulker check`](/docs/cli#shulker-check) on every push and pull request. It fails when `shulker.lock` doesn't match `shulker.json`, when a locked file can't be downloaded, or when a mod's dependencies aren't met on any side, and it builds and writes nothing. Save this as `.github/workflows/check.yml`:
 
@@ -34,7 +34,7 @@ The action keeps the download cache between runs, as it does for a release (see 
 
 Every problem shows as an annotation on the run, so a failed check lists what to fix on the workflow's summary page without opening the log. Shulker does this for every command's errors and warnings when `GITHUB_ACTIONS=true`, which every runner sets; pass `--no-annotations` to turn it off.
 
-## The workflow
+## The Workflow
 
 Save this as `.github/workflows/release.yml` in the pack's repository:
 
@@ -112,11 +112,11 @@ Set `prune: false` to keep every file a restored cache holds.
 
 Export never relocks. When `shulker.lock` doesn't match `shulker.json`, it fails with `lock-stale`: run `shulker lock` locally and commit the lock.
 
-### Files that aren't on CurseForge
+### Files That Aren't on CurseForge
 
 `export curseforge` refers to each file by its CurseForge file ID. A file locked from Modrinth or anywhere else is looked up on CurseForge by its fingerprint, and one that isn't there fails the export. Pass `--bundle` to put those files inside the archive instead; the CurseForge app warns about them on import. `export mrpack --bundle` does the same for files Modrinth launchers won't download.
 
-## Release notes
+## Release Notes
 
 Shulker doesn't write a changelog for a pack. The workflow lists the commit subjects since the previous tag, which is why the checkout fetches the full history with `fetch-depth: 0`. To write the notes by hand instead, keep them in a file in the repository and pass that to `--notes-file`.
 

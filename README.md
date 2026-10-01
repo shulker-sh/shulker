@@ -90,7 +90,7 @@ shulker link prism https://github.com/shulker-sh/base-pack.git
 
 Shulker is a launcher itself, and it links into five others. A link creates an instance inside the launcher's own folder that follows your project, or any pack's git or manifest URL, and fills the launcher's pre-launch and post-exit command slots. Before each launch the instance syncs. It fetches the pack's latest lock from its source, downloads what changed, places it, and leaves any file you edited alone with a warning. A sync never keeps you from playing, since one that cannot reach its source warns and builds from the lock it already has.
 
-| Launcher | Command | Syncs before each launch | Can use its accounts |
+| Launcher | Command | Syncs Before Each Launch | Can Use Its Accounts |
 | --- | --- | --- | --- |
 | [Shulker](https://shulker.sh) | `shulker link shulker` | yes | its own |
 | [Prism Launcher](https://github.com/PrismLauncher/PrismLauncher) | `shulker link prism` | yes | yes |
@@ -153,7 +153,7 @@ Sign in to Microsoft:
 
 These commands are what most projects need.
 
-| Command | What it does |
+| Command | What It Does |
 | --- | --- |
 | `shulker create` | Write `shulker.json` and `shulker.lock` from flags, taking the defaults for anything not given, without asking |
 | `shulker init` | The same, asking about each choice on the terminal |

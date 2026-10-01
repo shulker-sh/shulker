@@ -63,7 +63,7 @@ func TestCLIReferenceCoversEveryCommand(t *testing.T) {
 	}
 }
 
-// TestCLIReferenceListsScopeFlags holds the command lists under "Project and instance flags" to
+// TestCLIReferenceListsScopeFlags holds the command lists under "Project and Instance Flags" to
 // the commands that define -C and -i.
 func TestCLIReferenceListsScopeFlags(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("..", "..", "site", "docs", "cli.md"))
@@ -72,7 +72,7 @@ func TestCLIReferenceListsScopeFlags(t *testing.T) {
 	}
 	labels := map[string]string{"Both": "dir instance", "`-C` only": "dir", "`-i` only": "instance"}
 	documented := map[string]string{}
-	for _, line := range strings.Split(docsSection(string(data), "## Project and instance flags"), "\n") {
+	for _, line := range strings.Split(docsSection(string(data), "## Project and Instance Flags"), "\n") {
 		label, list, ok := strings.Cut(strings.TrimPrefix(line, "- "), ": ")
 		if !ok || !strings.HasPrefix(line, "- ") {
 			continue
@@ -117,7 +117,7 @@ func TestCLIReferenceListsScopeFlags(t *testing.T) {
 	}
 	sort.Strings(wrong)
 	if len(wrong) > 0 {
-		t.Fatalf("site/docs/cli.md \"Project and instance flags\" is wrong:\n  %s", strings.Join(wrong, "\n  "))
+		t.Fatalf("site/docs/cli.md \"Project and Instance Flags\" is wrong:\n  %s", strings.Join(wrong, "\n  "))
 	}
 }
 
@@ -164,7 +164,7 @@ func TestJSONReferenceCoversEveryErrorCode(t *testing.T) {
 		t.Fatal(err)
 	}
 	documented := map[string]bool{}
-	for _, m := range docsCodeRow.FindAllStringSubmatch(docsSection(string(data), "### Error codes"), -1) {
+	for _, m := range docsCodeRow.FindAllStringSubmatch(docsSection(string(data), "### Error Codes"), -1) {
 		documented[m[1]] = true
 	}
 	used := errorCodes(t, filepath.Join("..", ".."))
