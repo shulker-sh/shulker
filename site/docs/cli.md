@@ -1932,16 +1932,20 @@ shulker version --verbose
 
 Replace the running shulker with the latest release from GitHub. It only installs an [immutable release](https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/immutable-releases), one GitHub has locked so its files can't be replaced after it was published, and checks the download against the SHA256 GitHub recorded for it then. When the [GitHub CLI](https://cli.github.com) (`gh`) is installed, it also verifies the build provenance: that shulker's own release workflow built the archive. Without `gh`, it installs on the recorded digest alone.
 
+A pre-release, such as a release candidate `0.0.2-rc.1`, is never taken unless you pass `--pre`, which takes the highest version published, pre-release or not. Versions order as semantic versions do, so a build of `0.0.2-rc.1` updates to `0.0.2` once it is out, with or without the flag.
+
 It only replaces a binary that came from a release archive, which is what the install scripts and a GitHub download give you. One installed with `go install` or built from a clone fails `self-update-unmanaged`, naming the command that updates it instead: `go install shulker.sh/shulker@latest`, or `go build .`. `--check` works for every build: it prints the latest release, and the command for this build's route. A build from a clone has no version to compare, so `--check` reports the latest release without saying whether it is newer, and `available` is `null` in JSON. `install` in the JSON names the route: `release`, `go install` or `source`.
 
 ```sh
 shulker self update
 shulker self update --check
+shulker self update --pre
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--check` | Only report whether a newer release is available |
+| `--pre` | Take the newest release even when it is a pre-release, such as a release candidate |
 | `--without-attestation` | Skip the build provenance check |
 | `--require-attestation` | Fail unless `gh` verifies the build provenance |
 

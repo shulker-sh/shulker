@@ -29,7 +29,17 @@ func TestNeedsUpdate(t *testing.T) {
 		{"0.0.3", "v0.0.2", false},
 		{"0.0.9", "v0.1.0", true},
 		{"0.0.0-SNAPSHOT-7efc987", "v0.0.1", true},
-		{"0.0.2-rc1", "v0.0.2", false},
+		{"0.0.2-rc.1", "v0.0.2", true},
+		{"0.0.2", "v0.0.2-rc.1", false},
+		{"0.0.1", "v0.0.2-rc.1", true},
+		{"0.0.2-rc.1", "v0.0.2-rc.2", true},
+		{"0.0.2-rc.2", "v0.0.2-rc.10", true},
+		{"0.0.2-rc.2", "v0.0.2-rc.2", false},
+		{"0.0.2-beta.3", "v0.0.2-rc.1", true},
+		{"0.0.2-rc.1", "v0.0.2-beta.3", false},
+		{"0.0.2-rc", "v0.0.2-rc.1", true},
+		{"0.0.2+build.5", "v0.0.2", false},
+		{"0.1", "v0.1.0", false},
 	}
 	for _, c := range cases {
 		if got := NeedsUpdate(c.current, c.latest); got != c.want {

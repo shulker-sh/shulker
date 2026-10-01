@@ -174,7 +174,7 @@ func (s selfUninstallResult) print(l *out.Lines) {
 }
 
 func (a *app) selfUpdateCmd() *cobra.Command {
-	var check, without, require bool
+	var check, pre, without, require bool
 	cmd := &cobra.Command{
 		Use:         "update",
 		Annotations: decides(),
@@ -187,23 +187,24 @@ func (a *app) selfUpdateCmd() *cobra.Command {
 			if !check {
 				a.logActing()
 			}
-			return a.selfUpdate(cmd.Context(), check, without, require)
+			return a.selfUpdate(cmd.Context(), check, pre, without, require)
 		},
 	}
 	cmd.Flags().BoolVar(&check, "check", false, "only report whether a newer release is available.")
+	cmd.Flags().BoolVar(&pre, "pre", false, "take the newest release even when it is a pre-release, such as a release candidate.")
 	cmd.Flags().BoolVar(&without, "without-attestation", false, "skip the build provenance check.")
 	cmd.Flags().BoolVar(&require, "require-attestation", false, "fail unless gh verifies the build provenance.")
 	return cmd
 }
 
-func (a *app) selfUpdate(ctx context.Context, check, without, require bool) error {
+func (a *app) selfUpdate(ctx context.Context, check, pre, without, require bool) error {
 	r := a.releases
 	if r == nil {
 		f := fetch.New(a.build().Version)
 		f.Waiting = a.printer.Waiting
 		r = selfupdate.New(f)
 	}
-	rel, err := r.Latest(ctx)
+	rel, err := r.Latest(ctx, pre)
 	tag := rel.Tag
 	switch {
 	case errors.Is(err, fetch.ErrNotFound) && check:

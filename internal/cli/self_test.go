@@ -46,6 +46,9 @@ func newSelfUpdateHarness(t *testing.T, current, tag string, corrupt bool) *self
 	asset := selfupdate.AssetName(tag, runtime.GOOS, runtime.GOARCH)
 	h := &selfUpdateHarness{exe: filepath.Join(t.TempDir(), "shulker")}
 	mux := http.NewServeMux()
+	mux.HandleFunc("/releases", func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprintf(w, `[{"tag_name":"v9.9.9","draft":true},{"tag_name":%q,"immutable":true},{"tag_name":%q,"prerelease":true,"immutable":%t,"assets":[{"name":%q,"digest":"sha256:%s"}]},{"tag_name":"v0.0.1-rc.1","prerelease":true}]`, "v0.0.1", tag, !h.mutable, asset, checksum)
+	})
 	mux.HandleFunc("/latest", func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintf(w, `{"tag_name":%q,"immutable":%t,"assets":[{"name":%q,"digest":"sha256:%s"}]}`, tag, !h.mutable, asset, checksum)
 	})
@@ -63,6 +66,7 @@ func newSelfUpdateHarness(t *testing.T, current, tag string, corrupt bool) *self
 	h.app.build = func() selfupdate.Build { return selfupdate.Describe(current, "", nil) }
 	h.app.releases = selfupdate.New(fetch.New("test"))
 	h.app.releases.LatestURL = server.URL + "/latest"
+	h.app.releases.ListURL = server.URL + "/releases"
 	h.app.releases.DownloadURL = server.URL + "/download"
 	h.app.exe = func() (string, error) { return h.exe, nil }
 	return h
@@ -261,5 +265,25 @@ func TestSelfUpdateCheckWithNoReleaseSaysSo(t *testing.T) {
 	}
 	if code := h.run(); code == 0 {
 		t.Fatalf("an update with no release still fails: %s", &h.stdout)
+	}
+}
+
+func TestSelfUpdatePreTakesAReleaseCandidate(t *testing.T) {
+	h := newSelfUpdateHarness(t, "0.0.1", "v0.0.2-rc.2", false)
+	h.app.releases.LatestURL += "-missing"
+
+	if code := h.run("--pre"); code != 0 || h.binary(t) != "new binary" {
+		t.Fatalf("exit %d, binary %q\nstderr: %s", code, h.binary(t), &h.stderr)
+	}
+	if !strings.Contains(h.stdout.String(), "0.0.1 → 0.0.2-rc.2") {
+		t.Fatalf("stdout %q", &h.stdout)
+	}
+}
+
+func TestSelfUpdateFromAReleaseCandidateTakesTheRelease(t *testing.T) {
+	h := newSelfUpdateHarness(t, "0.0.2-rc.2", "v0.0.2", false)
+
+	if code := h.run(); code != 0 || h.binary(t) != "new binary" {
+		t.Fatalf("exit %d, binary %q\nstderr: %s", code, h.binary(t), &h.stderr)
 	}
 }

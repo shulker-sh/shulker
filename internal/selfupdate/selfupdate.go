@@ -4,6 +4,7 @@ package selfupdate
 import (
 	"archive/tar"
 	"archive/zip"
+	"cmp"
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
@@ -25,6 +26,7 @@ import (
 type Releases struct {
 	Fetch       *fetch.Client
 	LatestURL   string
+	ListURL     string
 	DownloadURL string
 }
 
@@ -32,6 +34,7 @@ func New(f *fetch.Client) *Releases {
 	return &Releases{
 		Fetch:       f,
 		LatestURL:   "https://api.github.com/repos/shulker-sh/shulker/releases/latest",
+		ListURL:     "https://api.github.com/repos/shulker-sh/shulker/releases?per_page=30",
 		DownloadURL: "https://github.com/shulker-sh/shulker/releases/download",
 	}
 }
@@ -46,29 +49,61 @@ type Published struct {
 	Digests map[string]string
 }
 
-// Latest is the newest published release.
-func (r *Releases) Latest(ctx context.Context) (Published, error) {
-	var rel struct {
-		TagName   string `json:"tag_name"`
-		Immutable bool   `json:"immutable"`
-		Assets    []struct {
-			Name   string `json:"name"`
-			Digest string `json:"digest"`
-		} `json:"assets"`
-	}
-	if err := r.Fetch.GetJSON(ctx, r.LatestURL, &rel); err != nil {
-		return Published{}, err
-	}
-	if rel.TagName == "" {
-		return Published{}, fmt.Errorf("%s: no tag_name in the response", r.LatestURL)
-	}
+type apiRelease struct {
+	TagName    string `json:"tag_name"`
+	Draft      bool   `json:"draft"`
+	Prerelease bool   `json:"prerelease"`
+	Immutable  bool   `json:"immutable"`
+	Assets     []struct {
+		Name   string `json:"name"`
+		Digest string `json:"digest"`
+	} `json:"assets"`
+}
+
+func (rel apiRelease) published() Published {
 	release := Published{Tag: rel.TagName, Immutable: rel.Immutable, Digests: map[string]string{}}
 	for _, a := range rel.Assets {
 		if sum, ok := strings.CutPrefix(a.Digest, "sha256:"); ok {
 			release.Digests[a.Name] = sum
 		}
 	}
-	return release, nil
+	return release
+}
+
+// Latest is the newest published release: the one GitHub calls latest, which is never a
+// pre-release, or with pre the highest version among the newest releases, pre-releases included.
+func (r *Releases) Latest(ctx context.Context, pre bool) (Published, error) {
+	if pre {
+		return r.latestOfAll(ctx)
+	}
+	var rel apiRelease
+	if err := r.Fetch.GetJSON(ctx, r.LatestURL, &rel); err != nil {
+		return Published{}, err
+	}
+	if rel.TagName == "" {
+		return Published{}, fmt.Errorf("%s: no tag_name in the response", r.LatestURL)
+	}
+	return rel.published(), nil
+}
+
+func (r *Releases) latestOfAll(ctx context.Context) (Published, error) {
+	var all []apiRelease
+	if err := r.Fetch.GetJSON(ctx, r.ListURL, &all); err != nil {
+		return Published{}, err
+	}
+	var newest *apiRelease
+	for i, rel := range all {
+		if rel.Draft || rel.TagName == "" {
+			continue
+		}
+		if newest == nil || NeedsUpdate(newest.TagName, rel.TagName) {
+			newest = &all[i]
+		}
+	}
+	if newest == nil {
+		return Published{}, fmt.Errorf("%s: %w", r.ListURL, fetch.ErrNotFound)
+	}
+	return newest.published(), nil
 }
 
 // AssetName is the release archive built for an OS and architecture.
@@ -150,30 +185,68 @@ func (r *Releases) url(tag, name string) string {
 	return r.DownloadURL + "/" + tag + "/" + name
 }
 
-// NeedsUpdate reports whether latest is newer than current, a release version; pre-release and
-// build suffixes are ignored. A Dev build has no version to compare, and the answer for it is
-// unknown rather than false.
+// NeedsUpdate reports whether latest is newer than current by semantic version precedence: a
+// release is newer than its own pre-releases, and build metadata is ignored. A Dev build has no
+// version to compare, and the answer for it is unknown rather than false.
 func NeedsUpdate(current, latest string) bool {
-	c, l := splitVersion(current), splitVersion(latest)
-	for i := 0; i < len(c) && i < len(l); i++ {
-		if l[i] != c[i] {
-			return l[i] > c[i]
-		}
-	}
-	return len(l) > len(c)
+	return compareVersions(latest, current) > 0
 }
 
-func splitVersion(v string) []int {
+func compareVersions(a, b string) int {
+	coreA, preA := splitVersion(a)
+	coreB, preB := splitVersion(b)
+	for i := 0; i < len(coreA) || i < len(coreB); i++ {
+		var x, y int
+		if i < len(coreA) {
+			x = coreA[i]
+		}
+		if i < len(coreB) {
+			y = coreB[i]
+		}
+		if x != y {
+			return cmp.Compare(x, y)
+		}
+	}
+	if len(preA) == 0 || len(preB) == 0 {
+		return cmp.Compare(len(preB), len(preA))
+	}
+	for i := 0; i < len(preA) && i < len(preB); i++ {
+		if c := comparePrerelease(preA[i], preB[i]); c != 0 {
+			return c
+		}
+	}
+	return cmp.Compare(len(preA), len(preB))
+}
+
+// comparePrerelease orders two pre-release identifiers: numbers by value and below any word,
+// words by their bytes.
+func comparePrerelease(a, b string) int {
+	x, errA := strconv.Atoi(a)
+	y, errB := strconv.Atoi(b)
+	switch {
+	case errA == nil && errB == nil:
+		return cmp.Compare(x, y)
+	case errA == nil:
+		return -1
+	case errB == nil:
+		return 1
+	}
+	return strings.Compare(a, b)
+}
+
+// splitVersion is a version's numbers and its pre-release identifiers, none for a release.
+func splitVersion(v string) (core []int, pre []string) {
 	v = strings.TrimPrefix(strings.TrimSpace(v), "v")
-	if i := strings.IndexAny(v, "-+"); i >= 0 {
-		v = v[:i]
+	v, _, _ = strings.Cut(v, "+")
+	v, suffix, isPre := strings.Cut(v, "-")
+	for _, p := range strings.Split(v, ".") {
+		n, _ := strconv.Atoi(p)
+		core = append(core, n)
 	}
-	parts := strings.Split(v, ".")
-	nums := make([]int, len(parts))
-	for i, p := range parts {
-		nums[i], _ = strconv.Atoi(p)
+	if isPre {
+		pre = strings.Split(suffix, ".")
 	}
-	return nums
+	return core, pre
 }
 
 // Executable is the running binary's path with symlinks resolved, so an install replaces the file
