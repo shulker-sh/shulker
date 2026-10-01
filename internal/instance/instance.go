@@ -8,6 +8,8 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/managed"
@@ -74,6 +76,39 @@ type LaunchSettings struct {
 	Java    string   `json:"java,omitempty"`
 	Window  string   `json:"window,omitempty"`
 	Wrapper []string `json:"wrapper,omitempty"`
+}
+
+// MemoryMB is the memory setting in megabytes, 0 when it is unset or isn't a size.
+func (s LaunchSettings) MemoryMB() int {
+	if len(s.Memory) < 2 {
+		return 0
+	}
+	n, err := strconv.Atoi(s.Memory[:len(s.Memory)-1])
+	if err != nil || n <= 0 {
+		return 0
+	}
+	switch s.Memory[len(s.Memory)-1] {
+	case 'G', 'g':
+		return n * 1024
+	case 'M', 'm':
+		return n
+	}
+	return 0
+}
+
+// WindowSize is the window setting as a width and height, and false when it is unset or isn't a
+// size.
+func (s LaunchSettings) WindowSize() (width, height int, ok bool) {
+	w, h, found := strings.Cut(s.Window, "x")
+	if !found {
+		return 0, 0, false
+	}
+	width, errW := strconv.Atoi(w)
+	height, errH := strconv.Atoi(h)
+	if errW != nil || errH != nil || width <= 0 || height <= 0 {
+		return 0, 0, false
+	}
+	return width, height, true
 }
 
 // LaunchKeys are the JSON keys of LaunchSettings.

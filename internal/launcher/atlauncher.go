@@ -33,7 +33,7 @@ var ATLauncherImage []byte
 // instance name, which is the game directory too, started from a complete version JSON.
 var atlauncherEntry = &Entry{
 	Name: "atlauncher", Title: "ATLauncher", IsInstanced: true, DefaultDir: DefaultATLauncherDir, gameDirIsInstance: true, NamesFolder: true,
-	Slot:  &Slot{Token: "$INST_DIR", Tokens: instTokens, Unreproducible: []string{"INST_JAVA", "INST_JAVA_ARGS"}, Quote: bareWord},
+	Slot:  &Slot{Token: "$INST_DIR", Tokens: instTokens, Unreproducible: []string{"INST_JAVA", "INST_JAVA_ARGS"}, Quote: bareWord, NoWindow: true},
 	Image: &Image{File: ATLauncherImageFile, Default: ATLauncherImage, fit: atlauncherCard},
 	Usage: Usage{
 		Short: "Create an ATLauncher instance that syncs the client build before each launch",

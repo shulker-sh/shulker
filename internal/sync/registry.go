@@ -41,6 +41,9 @@ func Reconcile(e *Env, in config.Instance) (rehooked bool) {
 	for _, command := range r.Adopted {
 		e.warnUnreproducible(*entry.Slot, command)
 	}
+	for _, key := range r.Unapplied {
+		e.Warn("%s keeps one %s setting for every instance, so the %s set for %s isn't applied.", entry.Title, key, key, in.ID)
+	}
 	if r.CommandsOn {
 		e.Warn("turned commands back on in %s for %s, since shulker's hooks run as its commands.", entry.Title, in.ID)
 	}

@@ -135,3 +135,19 @@ func TestSaveDocumentChecksTheSchemaBeforeWriting(t *testing.T) {
 		t.Fatalf("the file is untouched: %+v, %v", f, err)
 	}
 }
+
+func TestLaunchSettingsReadAsNumbers(t *testing.T) {
+	for memory, want := range map[string]int{"6G": 6144, "512M": 512, "2g": 2048, "": 0, "G": 0, "6": 0, "6T": 0} {
+		if got := (LaunchSettings{Memory: memory}).MemoryMB(); got != want {
+			t.Errorf("MemoryMB(%q) = %d, want %d", memory, got, want)
+		}
+	}
+	if w, h, ok := (LaunchSettings{Window: "1280x720"}).WindowSize(); !ok || w != 1280 || h != 720 {
+		t.Errorf("WindowSize = %d %d %v", w, h, ok)
+	}
+	for _, window := range []string{"", "1280", "x720", "0x720", "axb"} {
+		if _, _, ok := (LaunchSettings{Window: window}).WindowSize(); ok {
+			t.Errorf("WindowSize(%q) should not be a size", window)
+		}
+	}
+}

@@ -81,6 +81,15 @@ func Reconcile(e *Entry, in config.Instance, f *instance.File, exe string) (Reco
 	} else {
 		// The shim prepends the wrapper itself; every other launcher has a slot of its own for it.
 		want.Wrapper = WrapperCommand(in.Launcher, f.Settings.Wrapper)
+		want.MemoryMB = f.Settings.MemoryMB()
+		want.JVMArgs = WrapperCommand(in.Launcher, f.Settings.JVMArgs)
+		if width, height, ok := f.Settings.WindowSize(); ok {
+			if slot.NoWindow {
+				r.Unapplied = append(r.Unapplied, "window")
+			} else {
+				want.Width, want.Height = width, height
+			}
+		}
 	}
 	if err := WriteSlots(e, in, want); err != nil {
 		return r, err
@@ -103,6 +112,8 @@ type Reconciled struct {
 	Rehooked bool
 	// CommandsOn says the player had switched the launcher's commands off, and the write turned them on.
 	CommandsOn bool
+	// Unapplied are the launch settings the instance sets that the launcher has no place for.
+	Unapplied []string
 }
 
 // noSlots is the error for a launcher file that is gone or no longer holds the instance.

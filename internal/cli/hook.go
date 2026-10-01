@@ -147,6 +147,9 @@ func (a *app) hookWrapCmd() *cobra.Command {
 				e.Rows = []out.Detail{{Label: "Fix", Text: "shulker instances repair", IsCommand: true}}
 				return e
 			}
+			if launching {
+				argv = game.WithLaunchSettings(argv, f.Settings.Memory, f.Settings.JVMArgs, f.Settings.Window)
+			}
 			code, gaveWay, err := game.Run(game.Launch{Java: java, Argv: argv, Wrapper: f.Settings.Wrapper}, a.stdin, a.gameStdout(), a.printer.Stderr)
 			if gaveWay != nil {
 				a.printer.Warn("can't run the wrapper %q, so the game starts with Java alone: %v.", f.Settings.Wrapper[0], gaveWay)

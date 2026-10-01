@@ -87,12 +87,12 @@
         "memory": {
           "type": "string",
           "pattern": "^[1-9][0-9]*[MmGg]$",
-          "description": "Heap size `shulker play` gives the game, as -Xms and -Xmx, e.g. \"6G\". Omitted inherits `play.memory` from config.json, then the pack's `client.memory`, and without any of them 4G. Another launcher's instance takes its memory from that launcher."
+          "description": "Heap size `shulker play` gives the game, as -Xms and -Xmx, e.g. \"6G\". Omitted inherits `play.memory` from config.json, then the pack's `client.memory`, and without any of them 4G. Set here, it is also written into another launcher's instance as that launcher's own memory setting, at a link, a sync or a repair; omitted, that launcher's setting is left alone, and neither `play.memory` nor the pack's reaches it."
         },
         "jvmArgs": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 },
-          "description": "Extra JVM arguments for `shulker play`, after the version's own and the memory, so one of them wins over both. Omitted inherits `play.jvmArgs` from config.json. Replaces that list rather than adding to it."
+          "description": "Extra JVM arguments for `shulker play`, after the version's own and the memory, so one of them wins over both. Omitted inherits `play.jvmArgs` from config.json. Replaces that list rather than adding to it. Set here, it is also written into another launcher's instance as that launcher's own Java arguments; omitted, those are left alone."
         },
         "java": {
           "type": "string",
@@ -102,7 +102,7 @@
         "window": {
           "type": "string",
           "pattern": "^[1-9][0-9]*x[1-9][0-9]*$",
-          "description": "Window size `shulker play` opens the game at, as \"<width>x<height>\", e.g. \"1280x720\". The game takes it for the run and never writes it back; fullscreen is the pack's, in `client.options`. Omitted inherits `play.window` from config.json, and `play --window` wins over both for one run."
+          "description": "Window size `shulker play` opens the game at, as \"<width>x<height>\", e.g. \"1280x720\". The game takes it for the run and never writes it back; fullscreen is the pack's, in `client.options`. Omitted inherits `play.window` from config.json, and `play --window` wins over both for one run. Set here, it is also written into another launcher's instance as that launcher's own window size, except ATLauncher, which keeps one size for every instance and gets a warning instead."
         },
         "wrapper": {
           "type": "array",

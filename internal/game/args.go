@@ -3,6 +3,7 @@ package game
 import (
 	"maps"
 	"os"
+	"slices"
 	"strings"
 )
 
@@ -116,4 +117,55 @@ func GameDirOf(argv []string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// jvmValueOptions are the java options that take their value as the next argument, which is then
+// no main class.
+var jvmValueOptions = []string{
+	"-cp", "-classpath", "--class-path", "-p", "--module-path", "--upgrade-module-path", "--add-modules",
+	"--enable-native-access", "--limit-modules", "--add-exports", "--add-opens", "--add-reads", "--patch-module",
+}
+
+// mainClassIndex is where a java argv stops being JVM options: its main class, or -jar. It is -1
+// for an argv that names neither.
+func mainClassIndex(argv []string) int {
+	for i := 0; i < len(argv); i++ {
+		switch arg := argv[i]; {
+		case slices.Contains(jvmValueOptions, arg):
+			i++
+		case arg == "-jar" || !strings.HasPrefix(arg, "-"):
+			return i
+		}
+	}
+	return -1
+}
+
+// WithLaunchSettings is the argv a launcher gave Java with an instance's own launch settings put
+// in: the heap and the JVM arguments just before the main class, so they win over the launcher's
+// own the way a later option does, and the window size in place of the launcher's. A setting left
+// empty changes nothing, and an argv with no main class comes back as it was.
+func WithLaunchSettings(argv []string, memory string, jvmArgs []string, window string) []string {
+	at := mainClassIndex(argv)
+	if at < 0 {
+		return argv
+	}
+	var jvm []string
+	if memory != "" {
+		jvm = append(jvm, "-Xms"+memory, "-Xmx"+memory)
+	}
+	jvm = append(jvm, jvmArgs...)
+	out := slices.Concat(argv[:at], jvm, argv[at:])
+	width, height, sized := strings.Cut(window, "x")
+	if !sized {
+		return out
+	}
+	game := at + len(jvm)
+	for _, size := range [][2]string{{"--width", width}, {"--height", height}} {
+		if i := slices.Index(out[game:], size[0]); i >= 0 && game+i+1 < len(out) {
+			out[game+i+1] = size[1]
+			continue
+		}
+		out = append(out, size[0], size[1])
+	}
+	return out
 }

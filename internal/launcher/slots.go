@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"shulker.sh/shulker/internal/config"
@@ -35,6 +36,9 @@ type Slot struct {
 	// Quote quotes one word of a command the way the launcher splits it. Nil means CommandArg's
 	// plain double quotes, which every other parser reads alike.
 	Quote func(word, goos string) string
+	// NoWindow marks a launcher that keeps one window size for every instance, so an instance's
+	// own can't be written.
+	NoWindow bool
 }
 
 func (s Slot) quote(word, goos string) string {
@@ -106,6 +110,12 @@ type Slots struct {
 	// Commands is read only: the launcher's own switch for running an instance's commands, nil
 	// where it has none or the instance leaves it unset. Writing a command turns it on.
 	Commands *bool
+	// MemoryMB, JVMArgs and Width with Height are the instance's own launch settings, write only
+	// and, like the wrapper, only ever filled: one the instance leaves unset stays the launcher's.
+	// JVMArgs is one string, split by the launcher the way it splits a wrapper.
+	MemoryMB      int
+	JVMArgs       string
+	Width, Height int
 }
 
 // WrapperCommand is settings.wrapper as one string for a launcher's own wrapper slot. Each launcher
@@ -242,6 +252,7 @@ func writePrismSlots(e *Entry, in config.Instance, s Slots) error {
 	if len(set) > 0 {
 		set["OverrideCommands"] = "true"
 	}
+	settingKeys := mmcLaunchSettings(set, s)
 	var buf bytes.Buffer
 	if len(lines) == 0 {
 		lines = []string{"[General]"}
@@ -260,12 +271,39 @@ func writePrismSlots(e *Entry, in config.Instance, s Slots) error {
 		}
 		buf.WriteString(line + "\n")
 	}
-	for _, key := range []string{"OverrideCommands", "PreLaunchCommand", "PostExitCommand", "WrapperCommand"} {
+	for _, key := range append([]string{"OverrideCommands", "PreLaunchCommand", "PostExitCommand", "WrapperCommand"}, settingKeys...) {
 		if value, has := set[key]; has && !done[key] {
 			fmt.Fprintf(&buf, "%s=%s\n", key, prismEscape(value))
 		}
 	}
 	return fsutil.Write(path, buf.Bytes())
+}
+
+// mmcLaunchSettings adds the launch settings s carries to the instance.cfg keys being set, in the
+// keys Prism and MultiMC share, and returns the keys it added in the order they are written. Each
+// group is read from the instance only with its Override switch on (MinecraftInstance.cpp).
+func mmcLaunchSettings(set map[string]string, s Slots) []string {
+	var keys []string
+	add := func(key, value string) {
+		set[key] = value
+		keys = append(keys, key)
+	}
+	if s.MemoryMB > 0 {
+		add("OverrideMemory", "true")
+		add("MinMemAlloc", strconv.Itoa(s.MemoryMB))
+		add("MaxMemAlloc", strconv.Itoa(s.MemoryMB))
+	}
+	if s.JVMArgs != "" {
+		add("OverrideJavaArgs", "true")
+		add("JvmArgs", s.JVMArgs)
+	}
+	if s.Width > 0 && s.Height > 0 {
+		add("OverrideWindow", "true")
+		add("LaunchMaximized", "false")
+		add("MinecraftWinWidth", strconv.Itoa(s.Width))
+		add("MinecraftWinHeight", strconv.Itoa(s.Height))
+	}
+	return keys
 }
 
 func writeMultiMCSlots(e *Entry, in config.Instance, s Slots) error {
@@ -291,6 +329,7 @@ func writeMultiMCSlots(e *Entry, in config.Instance, s Slots) error {
 	if len(set) > 0 {
 		set["OverrideCommands"] = "true"
 	}
+	settingKeys := mmcLaunchSettings(set, s)
 	var buf bytes.Buffer
 	if len(lines) == 0 {
 		lines = []string{"[General]"}
@@ -309,7 +348,7 @@ func writeMultiMCSlots(e *Entry, in config.Instance, s Slots) error {
 		}
 		buf.WriteString(line + "\n")
 	}
-	for _, key := range []string{"OverrideCommands", "PreLaunchCommand", "PostExitCommand", "WrapperCommand"} {
+	for _, key := range append([]string{"OverrideCommands", "PreLaunchCommand", "PostExitCommand", "WrapperCommand"}, settingKeys...) {
 		if value, has := set[key]; has && !done[key] {
 			fmt.Fprintf(&buf, "%s=%s\n", key, multimcEscape(value))
 		}
@@ -332,6 +371,12 @@ func writeATLauncherSlots(e *Entry, in config.Instance, s Slots) error {
 	}
 	if s.Wrapper != "" {
 		settings["wrapperCommand"] = jsonString(s.Wrapper)
+	}
+	if s.MemoryMB > 0 {
+		settings["maximumMemory"] = json.RawMessage(strconv.Itoa(s.MemoryMB))
+	}
+	if s.JVMArgs != "" {
+		settings["javaArguments"] = jsonString(s.JVMArgs)
 	}
 	// enableCommands is per instance, so reconcile has to set it or a generated or adopted command
 	// silently never runs. It gates the wrapper too, so a wrapper already in the file keeps it on.
@@ -363,7 +408,28 @@ func writeGDLauncherSlots(e *Entry, in config.Instance, s Slots) error {
 	if s.Wrapper != "" {
 		top["wrapper_command"] = jsonString(s.Wrapper)
 	}
-	return fsutil.WriteJSON(filepath.Join(instanceDir, GDLauncherInstanceFile), top)
+	path := filepath.Join(instanceDir, GDLauncherInstanceFile)
+	if s.MemoryMB > 0 || s.JVMArgs != "" || s.Width > 0 && s.Height > 0 {
+		game, err := jsonObjectAt(path, top, "game_configuration")
+		if err != nil {
+			return err
+		}
+		if s.MemoryMB > 0 {
+			if game["memory"], err = json.Marshal(map[string]int{"min_mb": s.MemoryMB, "max_mb": s.MemoryMB}); err != nil {
+				return err
+			}
+		}
+		if s.JVMArgs != "" {
+			game["extra_java_args"] = jsonString(s.JVMArgs)
+		}
+		if s.Width > 0 && s.Height > 0 {
+			game["game_resolution"] = jsonString(fmt.Sprintf("custom:%dx%d", s.Width, s.Height))
+		}
+		if top["game_configuration"], err = json.Marshal(game); err != nil {
+			return err
+		}
+	}
+	return fsutil.WriteJSON(path, top)
 }
 
 // ReleaseSlots hands an instance's slots back to its launcher: a command shulker adopted returns to
