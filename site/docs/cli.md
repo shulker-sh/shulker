@@ -747,14 +747,6 @@ shulker config unset curseforge.key
 | --- | --- |
 | `--force` | Change the registry even if it leaves linked instances or synced directories behind |
 
-## Features
-
-A feature is a name that mods opt into with a `feature` condition, like `shaders`. `features` in `shulker.json` declares each one, and its `default` turns it on. Your own choices are saved in `shulker.local.json` next to `shulker.json`. That file is per machine and is added to `.gitignore`. `build`, `install`, `sync`, `export mrpack`, and `export curseforge` use your choices over the declared defaults, and their `--with` and `--without` flags override both for one run.
-
-A `shulker.local.json` shulker can't read never stops a command. When it isn't valid JSON, names no `$schema` or another file's, or was written by a newer shulker, shulker renames it to `shulker.local.json.replaced`, warns naming both paths, and goes on with the declared defaults. The next `feature on` or `off` writes a fresh file. For a newer file, the warning says to run `shulker self update` and move it back.
-
-A directory you sync into, such as a launcher instance, can have its own choices in its own `shulker.local.json`. Set them with `--into <dir>`, or with `-i <id>` for anything [`shulker instances`](#shulker-instances) lists. When you sync into it, its choices beat the project's, and `--with` and `--without` still beat both.
-
 ### `shulker config path`
 
 Print where `config.json` is, whether or not the file exists yet: `$SHULKER_CONFIG` when set, else the platform's config directory. [`shulker cache info`](#shulker-cache-info) prints the cache's location and [`shulker config get registry`](#shulker-config-get) the registry's; [`shulker version --verbose`](#shulker-version) shows them together.
@@ -762,6 +754,14 @@ Print where `config.json` is, whether or not the file exists yet: `$SHULKER_CONF
 ```sh
 shulker config path
 ```
+
+## Features
+
+A feature is a name that mods opt into with a `feature` condition, like `shaders`. `features` in `shulker.json` declares each one, and its `default` turns it on. Your own choices are saved in `shulker.local.json` next to `shulker.json`. That file is per machine and is added to `.gitignore`. `build`, `install`, `sync`, `export mrpack`, and `export curseforge` use your choices over the declared defaults, and their `--with` and `--without` flags override both for one run.
+
+A `shulker.local.json` shulker can't read never stops a command. When it isn't valid JSON, names no `$schema` or another file's, or was written by a newer shulker, shulker renames it to `shulker.local.json.replaced`, warns naming both paths, and goes on with the declared defaults. The next `feature on` or `off` writes a fresh file. For a newer file, the warning says to run `shulker self update` and move it back.
+
+A directory you sync into, such as a launcher instance, can have its own choices in its own `shulker.local.json`. Set them with `--into <dir>`, or with `-i <id>` for anything [`shulker instances`](#shulker-instances) lists. When you sync into it, its choices beat the project's, and `--with` and `--without` still beat both.
 
 ### `shulker feature on|off`
 
