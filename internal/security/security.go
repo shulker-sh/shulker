@@ -87,11 +87,11 @@ func Protections(releaseAge time.Duration, sandbox bool) []Protection {
 	}
 	return append(slices.Clone(protections), Protection{
 		ID:      Sandbox,
-		Summary: "A sandboxed game can read and write its own instance and saves and nothing else under your home folder, so a malicious mod can't read your keys, browser profiles and launcher accounts, or install itself to start with your computer.",
+		Summary: "Experimental. A sandboxed game can read and write its own instance and saves and nothing else under your home folder, so a malicious mod can't read your keys, browser profiles and launcher accounts, or install itself to start with your computer.",
 		On:      sandbox,
 		Setting: "security.sandbox",
 		Value:   onOff(sandbox),
-		Changes: "Whether an instance that doesn't set sandbox itself runs its game sandboxed, on macOS and on Linux with bubblewrap",
+		Changes: "Whether an instance that doesn't set sandbox itself runs its game sandboxed; experimental, on macOS and on Linux with bubblewrap",
 	}, Protection{
 		ID:      ReleaseAge,
 		Summary: "A version published more recently than the release age is held back when shulker chooses one, so a hijacked mod's new release has time to be caught and taken down before it reaches you.",

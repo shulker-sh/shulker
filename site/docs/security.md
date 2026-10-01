@@ -26,14 +26,44 @@ This page is for both. An agent can read it offline with `shulker docs security`
 | `sync-review` | A sync lists the mods it adds, the files no provider published and the entries now locked from another project, and asks before applying them at a terminal. |
 | `takedowns` | An audit, and a sync once a day, ask Modrinth and CurseForge whether they still have each locked file. |
 | `release-age` | A version younger than `security.minReleaseAge` is held back when shulker chooses one, so a hijacked mod's new release has time to be caught first. |
+| `sandbox` | Experimental, and off unless you turn it on. The game runs with the rest of your home folder out of its reach. See [The Sandbox](#the-sandbox). |
 
 Every security warning and error ends by pointing at `shulker security`, and with `--json` a security error names its protection in `error.protection`.
+
+## The Sandbox
+
+**Experimental.** The sandbox is off by default, it has been tested less than everything else on this page, and it can break mods that reach outside their instance. It is supported on macOS and Linux only; there is no sandbox on Windows.
+
+With it on, the game and every mod in it can read and write its own instance and worlds, and nothing else in your home folder: not your SSH keys, browser profiles, launcher accounts or other instances. It can't change its own mods or how it is started, so a mod can't use one launch to get out of the sandbox on the next. It works under [`shulker play`](/docs/cli#shulker-play) and in every launcher shulker links.
+
+Turn it on for one instance, or for every instance that doesn't say otherwise:
+
+```sh
+shulker instance set sandbox true
+shulker config set security.sandbox true
+```
+
+[`shulker link --sandbox`](/docs/cli#shulker-link) turns it on as it links.
+
+Shulker doesn't confine the game itself. It asks the operating system to:
+
+- **macOS** uses `sandbox-exec`, the system's own sandbox.
+- **Linux** uses [bubblewrap](https://github.com/containers/bubblewrap), the tool Flatpak builds its sandboxes with. It has to be installed (`bwrap`), and most desktop distributions already ship it. Ubuntu 24.04 and later stop it from starting until an AppArmor profile allows it. On Linux 6.12 and later shulker also uses Landlock, a kernel feature, to close one gap bubblewrap leaves.
+
+Where the sandbox can't start, the game runs without it and shulker says why, each time. A game that is set to run sandboxed and can't be put in the sandbox at launch doesn't start.
+
+What it doesn't do:
+
+- **The network stays open**, for multiplayer. The sandbox limits what a mod can read and whether it can install itself on your machine, not whether it can send what it reads.
+- **A mod can still change its own instance**: its options, configs and worlds.
+- **On macOS** the game's "Open Pack Folder" and "Open Screenshots Folder" buttons do nothing while it is on.
+- **On Linux under X11** one program can control another's window, and the sandbox doesn't change that. Wayland doesn't allow it.
 
 ## What It Doesn't
 
 - **A vanished file is not proof.** Neither provider says why a file went, and authors delete their own old versions too. A takedown is a reason to look, not a verdict.
 - **Shulker doesn't police files changed after it placed them.** A mod's self-updater, a player's edit and malware all look the same from outside. A build warns about a jar that no longer matches the lock and keeps it; `shulker build --force` puts the locked copy back.
-- **There is no sandbox yet.** A mod can read anything your account can.
+- **The sandbox is off by default.** Without it a mod can read anything your account can. See [The Sandbox](#the-sandbox) for what it adds and what it still leaves open.
 - **There is no malware scanner or known-bad list yet.** The providers don't publish one, and shulker doesn't look inside a jar for you; the commands below let you or an agent look.
 - **A download hash guards the trip, not the file.** Whoever wrote the lock picked the hash.
 - **The install scripts trust GitHub and TLS**, unless the GitHub CLI is installed. See [How Shulker Reaches You](#how-shulker-reaches-you).

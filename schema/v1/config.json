@@ -140,7 +140,7 @@
         "sandbox": {
           "type": "boolean",
           "default": false,
-          "description": "Whether an instance that doesn't set `sandbox` itself runs its game sandboxed, with the rest of your home folder out of the game's reach. On macOS through sandbox-exec and on Linux through bubblewrap, which has to be installed; where neither can run, the game starts without it and shulker says why."
+          "description": "Experimental. Whether an instance that doesn't set `sandbox` itself runs its game sandboxed, with the rest of your home folder out of the game's reach. On macOS through sandbox-exec and on Linux through bubblewrap, which has to be installed; where neither can run, the game starts without it and shulker says why."
         }
       }
     },
