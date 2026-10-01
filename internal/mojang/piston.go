@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"io/fs"
+	"net/url"
+	"slices"
 
 	"shulker.sh/shulker/internal/fetch"
 )
@@ -64,6 +66,20 @@ func (m *GameManifest) Find(id string) (GameVersion, bool) {
 type Download struct {
 	URL  string `json:"url"`
 	Sha1 string `json:"sha1"`
+}
+
+// downloadHosts are where Mojang's version JSONs serve a game's own jars from.
+var downloadHosts = []string{"piston-data.mojang.com", "launcher.mojang.com"}
+
+// Serves reports whether Mojang serves a game jar from address: one of its download hosts, or the
+// host the version manifest is read from.
+func (p *Piston) Serves(address string) bool {
+	u, err := url.Parse(address)
+	if err != nil || u.Scheme != "https" {
+		return false
+	}
+	manifest, err := url.Parse(p.ManifestURL)
+	return slices.Contains(downloadHosts, u.Host) || err == nil && u.Host == manifest.Host
 }
 
 func (p *Piston) ServerDownload(ctx context.Context, game string) (Download, error) {

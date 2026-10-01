@@ -76,3 +76,20 @@ func TestDataVersionIsUnknownWithoutOne(t *testing.T) {
 		}
 	}
 }
+
+func TestPistonServesOnlyMojangsHosts(t *testing.T) {
+	p := NewPiston(nil)
+	for address, want := range map[string]bool{
+		"https://piston-data.mojang.com/v1/objects/abc/server.jar": true,
+		"https://launcher.mojang.com/v1/objects/abc/server.jar":    true,
+		"https://piston-meta.mojang.com/server.jar":                true,
+		"http://piston-data.mojang.com/v1/objects/abc/server.jar":  false,
+		"https://example.com/piston-data.mojang.com/server.jar":    false,
+		"https://piston-data.mojang.com.example.com/server.jar":    false,
+		"server.jar": false,
+	} {
+		if got := p.Serves(address); got != want {
+			t.Errorf("%s: got %v, want %v", address, got, want)
+		}
+	}
+}

@@ -6,6 +6,8 @@ import (
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/mojang"
+	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/security"
 )
 
 // EnsureServerJar caches the vanilla and loader server jars, locking any the lock doesn't have yet.
@@ -23,6 +25,12 @@ func (r *Resolver) EnsureServerJar(ctx context.Context, mt *Meta) (loader.Server
 func (r *Resolver) ensureVanillaServer(ctx context.Context, piston *mojang.Piston) (loader.ServerResult, error) {
 	var res loader.ServerResult
 	if locked := r.Lock.Server; locked != nil {
+		if !piston.Serves(locked.URL) {
+			e := out.Errorf("provenance-mismatch", "the lock has the Minecraft server downloading from %s, which isn't Mojang's", locked.URL)
+			e.Help = "remove server from the lock that names it, so shulker locks it again"
+			return res, security.Refusal(security.Provenance, e)
+		}
+
 		if r.Cache.Has(locked.Sha512) {
 			return res, nil
 		}
