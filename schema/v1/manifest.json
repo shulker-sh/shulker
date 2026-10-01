@@ -46,7 +46,7 @@
       "type": "string",
       "minLength": 1,
       "pattern": "\\.[Pp][Nn][Gg]$",
-      "description": "The pack's icon: a path to a PNG inside the project, e.g. \"assets/icon.png\". Exports carry it, as icon.png at the root of an mrpack and as the CurseForge profile image, and linked ATLauncher and GDLauncher instances show it, fitted onto ATLauncher's 300x150 card. A sync replaces the launcher's image only when the icon changes, so one the player picked stays until then. Without it, a pack that uses the marker exports the shulker icon."
+      "description": "The pack's icon: a path to a PNG inside the project, e.g. \"assets/icon.png\". Exports carry it, as icon.png at the root of an mrpack and as the CurseForge profile image, and a linked instance shows it in every launcher, fitted onto ATLauncher's 300x150 card and the Minecraft Launcher's 128x128 profile icon. A sync replaces the launcher's image only when the icon changes, so one the player picked stays until then. Without it, a pack that uses the marker exports the shulker icon."
     },
     "minecraft": {
       "$ref": "#/$defs/semverRange",

@@ -3,6 +3,7 @@ package launcher
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -37,6 +38,7 @@ func invalidLoaderProfile(problem string) *out.Error {
 var mojangEntry = &Entry{
 	Name: "mojang", Title: "Minecraft Launcher", DefaultDir: DefaultMojangDir,
 	Slot: &Slot{UsesShim: true}, NeedsRuntime: true,
+	Image: &Image{Default: Icon, fit: mojangIcon, write: writeMojangImage},
 	Usage: Usage{
 		Short:   "Add an official launcher profile that follows a pack, installing the pack's loader if it has one",
 		Aliases: []string{"vanilla"},
@@ -273,7 +275,7 @@ func (m *Mojang) WriteProfile(p Profile) error {
 		entry["created"] = now
 	}
 	if _, ok := entry["icon"]; !ok {
-		entry["icon"] = "Chest"
+		entry["icon"] = mojangIconValue(Icon)
 	}
 	entry["name"] = p.Name
 	entry["type"] = "custom"
@@ -431,6 +433,27 @@ func (m *Mojang) JavaDir(gameDir string) (string, bool, error) {
 // SetJavaDir points every shulker profile for a game directory at a Java, an empty one deleting the
 // key so the launcher goes back to choosing the runtime itself.
 func (m *Mojang) SetJavaDir(gameDir, javaDir string) error {
+	return m.setProfileKey(gameDir, "javaDir", javaDir)
+}
+
+// mojangIcon fits an icon into the 128px square the launcher takes a custom profile icon as.
+func mojangIcon(icon []byte) ([]byte, error) {
+	return fitCanvas(icon, 128, 128, 128)
+}
+
+// mojangIconValue is a PNG as a profile's icon: the launcher keeps a custom one inline as a data
+// URI, where a bare word names one of its own.
+func mojangIconValue(image []byte) string {
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(image)
+}
+
+func writeMojangImage(_ *Entry, in config.Instance, image []byte) error {
+	return (&Mojang{Dir: in.LauncherDir}).setProfileKey(in.Dir, "icon", mojangIconValue(image))
+}
+
+// setProfileKey sets one key on every shulker profile for a game directory, an empty value deleting
+// it.
+func (m *Mojang) setProfileKey(gameDir, name, value string) error {
 	top, profiles, err := m.readProfiles()
 	if err != nil {
 		return err
@@ -441,14 +464,14 @@ func (m *Mojang) SetJavaDir(gameDir, javaDir string) error {
 		if err := json.Unmarshal(profiles[key], &entry); err != nil {
 			return invalidFile(m.profilesPath(), fmt.Errorf("profile %s: %w", key, err))
 		}
-		if current, _ := entry["javaDir"].(string); current == javaDir {
+		if current, _ := entry[name].(string); current == value {
 			continue
 		}
 		changed = true
-		if javaDir == "" {
-			delete(entry, "javaDir")
+		if value == "" {
+			delete(entry, name)
 		} else {
-			entry["javaDir"] = javaDir
+			entry[name] = value
 		}
 		if profiles[key], err = json.Marshal(entry); err != nil {
 			return err

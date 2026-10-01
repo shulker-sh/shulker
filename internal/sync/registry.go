@@ -99,7 +99,7 @@ func (e *Env) syncLauncherImage(dir string, b *build.Builder) {
 	if err == nil {
 		last := instance.LoadState(dir).LauncherImage
 		var hash string
-		if hash, err = entry.SyncImage(dir, icon, last); err == nil && hash != last {
+		if hash, err = entry.SyncImage(in, icon, last); err == nil && hash != last {
 			err = instance.RecordLauncherImage(dir, hash)
 		}
 	}

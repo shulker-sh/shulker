@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/loader"
 )
@@ -23,7 +24,8 @@ const (
 // default directory and a link asks for one.
 var multimcEntry = &Entry{
 	Name: "multimc", Title: "MultiMC", IsInstanced: true,
-	Slot: &Slot{Token: "$INST_MC_DIR", Tokens: instTokens},
+	Slot:  &Slot{Token: "$INST_MC_DIR", Tokens: instTokens},
+	Image: &Image{Default: Icon, write: writeMultiMCImage},
 	Usage: Usage{
 		Short:     "Create a MultiMC instance that syncs the client build before each launch",
 		Noun:      "instance",
@@ -91,15 +93,30 @@ func linkMultiMC(_ context.Context, _ *Entry, req *Link, _ Placement) (InstanceR
 	})
 }
 
-func (m *MultiMC) InstancesDir() string {
+func (m *MultiMC) InstancesDir() string { return m.settingDir("InstanceDir", "instances") }
+
+// IconsDir is where the launcher keeps the icons instances name by key, each as <key>.png.
+func (m *MultiMC) IconsDir() string { return m.settingDir("IconsDir", "icons") }
+
+func (m *MultiMC) iconFile(key string) string { return filepath.Join(m.IconsDir(), key+".png") }
+
+// settingDir is a folder multimc.cfg can move, relative to the launcher directory unless absolute.
+func (m *MultiMC) settingDir(key, fallback string) string {
 	values, err := readINI(filepath.Join(m.Dir, "multimc.cfg"), multimcUnescape)
-	if dir := values["InstanceDir"]; err == nil && dir != "" {
+	if dir := values[key]; err == nil && dir != "" {
 		if filepath.IsAbs(dir) {
 			return dir
 		}
 		return filepath.Join(m.Dir, dir)
 	}
-	return filepath.Join(m.Dir, "instances")
+	return filepath.Join(m.Dir, fallback)
+}
+
+// writeMultiMCImage writes the icon the instance's iconKey names, which a link sets to the instance's
+// own folder name. An instance whose player picked another icon keeps showing that one.
+func writeMultiMCImage(e *Entry, in config.Instance, image []byte) error {
+	l := &MultiMC{Dir: in.LauncherDir}
+	return writeIconFile(l.iconFile(filepath.Base(e.InstanceDir(in.Dir))), image)
 }
 
 func (m *MultiMC) WriteInstance(inst MultiMCInstance) (InstanceResult, error) {
@@ -117,6 +134,9 @@ func (m *MultiMC) WriteInstance(inst MultiMCInstance) (InstanceResult, error) {
 		return res, err
 	}
 	if err := writeMultiMCPack(filepath.Join(dir, MultiMCPackFile), inst); err != nil {
+		return res, err
+	}
+	if err := writeDefaultIcon(m.iconFile(inst.ID)); err != nil {
 		return res, err
 	}
 	return res, writeMultiMCInstanceConfig(cfgPath, inst)
@@ -192,16 +212,18 @@ func writeMultiMCInstanceConfig(path string, inst MultiMCInstance) error {
 	if err != nil {
 		return err
 	}
-	set := map[string]string{"InstanceType": "OneSix", "name": inst.Name}
+	set := map[string]string{"InstanceType": "OneSix", "name": inst.Name, "iconKey": inst.ID}
 	var buf bytes.Buffer
 	if len(lines) == 0 {
 		lines = []string{"[General]"}
 	}
 	done := map[string]bool{}
 	for _, line := range lines {
-		key, _, ok := splitINILine(line)
+		key, current, ok := splitINILine(line)
 		if ok {
-			if value, has := set[key]; has {
+			if key == "iconKey" && keepsIconKey(multimcUnescape(current)) {
+				done[key] = true
+			} else if value, has := set[key]; has {
 				fmt.Fprintf(&buf, "%s=%s\n", key, multimcEscape(value))
 				done[key] = true
 				continue
@@ -209,7 +231,7 @@ func writeMultiMCInstanceConfig(path string, inst MultiMCInstance) error {
 		}
 		buf.WriteString(line + "\n")
 	}
-	for _, key := range []string{"InstanceType", "name", "OverrideCommands", "PreLaunchCommand"} {
+	for _, key := range []string{"InstanceType", "name", "iconKey", "OverrideCommands", "PreLaunchCommand"} {
 		if value, has := set[key]; has && !done[key] {
 			fmt.Fprintf(&buf, "%s=%s\n", key, multimcEscape(value))
 		}

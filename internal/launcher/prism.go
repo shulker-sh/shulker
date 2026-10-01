@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 
+	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/loader"
 )
@@ -24,7 +25,8 @@ const (
 // whose minecraft/ is the game directory, with the loader installed from mmc-pack.json.
 var prismEntry = &Entry{
 	Name: "prism", Title: "Prism Launcher", IsInstanced: true, DefaultDir: DefaultPrismDir,
-	Slot: &Slot{Token: "$INST_MC_DIR", Tokens: instTokens},
+	Slot:  &Slot{Token: "$INST_MC_DIR", Tokens: instTokens},
+	Image: &Image{Default: Icon, write: writePrismImage},
 	Usage: Usage{
 		Short: "Create a Prism Launcher instance that syncs the client build before each launch",
 		Noun:  "instance",
@@ -155,15 +157,30 @@ func restartIfUpdated(e *Entry, res InstanceResult) string {
 	return "restart " + e.Title + " if it is open so the change is picked up"
 }
 
-func (p *Prism) InstancesDir() string {
+func (p *Prism) InstancesDir() string { return p.settingDir("InstanceDir", "instances") }
+
+// IconsDir is where the launcher keeps the icons instances name by key, each as <key>.png.
+func (p *Prism) IconsDir() string { return p.settingDir("IconsDir", "icons") }
+
+func (p *Prism) iconFile(key string) string { return filepath.Join(p.IconsDir(), key+".png") }
+
+// settingDir is a folder prismlauncher.cfg can move, relative to the launcher directory unless absolute.
+func (p *Prism) settingDir(key, fallback string) string {
 	values, err := readINI(filepath.Join(p.Dir, "prismlauncher.cfg"), prismUnescape)
-	if dir := values["InstanceDir"]; err == nil && dir != "" {
+	if dir := values[key]; err == nil && dir != "" {
 		if filepath.IsAbs(dir) {
 			return dir
 		}
 		return filepath.Join(p.Dir, dir)
 	}
-	return filepath.Join(p.Dir, "instances")
+	return filepath.Join(p.Dir, fallback)
+}
+
+// writePrismImage writes the icon the instance's iconKey names, which a link sets to the instance's
+// own folder name. An instance whose player picked another icon keeps showing that one.
+func writePrismImage(e *Entry, in config.Instance, image []byte) error {
+	l := &Prism{Dir: in.LauncherDir}
+	return writeIconFile(l.iconFile(filepath.Base(e.InstanceDir(in.Dir))), image)
 }
 
 func (p *Prism) WriteInstance(inst PrismInstance) (InstanceResult, error) {
@@ -181,6 +198,9 @@ func (p *Prism) WriteInstance(inst PrismInstance) (InstanceResult, error) {
 		return res, err
 	}
 	if err := writePrismPack(filepath.Join(dir, PrismPackFile), inst); err != nil {
+		return res, err
+	}
+	if err := writeDefaultIcon(p.iconFile(inst.ID)); err != nil {
 		return res, err
 	}
 	return res, writePrismInstanceConfig(cfgPath, inst)
@@ -257,16 +277,16 @@ func writePrismInstanceConfig(path string, inst PrismInstance) error {
 	if err != nil {
 		return err
 	}
-	set := map[string]string{"ConfigVersion": "1.3", "InstanceType": "OneSix", "name": inst.Name}
+	set := map[string]string{"ConfigVersion": "1.3", "InstanceType": "OneSix", "name": inst.Name, "iconKey": inst.ID}
 	var buf bytes.Buffer
 	if len(lines) == 0 {
 		lines = []string{"[General]"}
 	}
 	done := map[string]bool{}
 	for _, line := range lines {
-		key, _, ok := splitINILine(line)
+		key, current, ok := splitINILine(line)
 		if ok {
-			if key == "ConfigVersion" {
+			if key == "ConfigVersion" || key == "iconKey" && keepsIconKey(prismUnescape(current)) {
 				done[key] = true
 			} else if value, has := set[key]; has {
 				fmt.Fprintf(&buf, "%s=%s\n", key, prismEscape(value))
@@ -276,7 +296,7 @@ func writePrismInstanceConfig(path string, inst PrismInstance) error {
 		}
 		buf.WriteString(line + "\n")
 	}
-	for _, key := range []string{"ConfigVersion", "InstanceType", "name", "OverrideCommands", "PreLaunchCommand"} {
+	for _, key := range []string{"ConfigVersion", "InstanceType", "name", "iconKey", "OverrideCommands", "PreLaunchCommand"} {
 		if value, has := set[key]; has && !done[key] {
 			fmt.Fprintf(&buf, "%s=%s\n", key, prismEscape(value))
 		}
