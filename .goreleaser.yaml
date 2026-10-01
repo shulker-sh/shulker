@@ -45,6 +45,8 @@ checksum:
 release:
   # Published by the workflow's last step: an immutable release takes no more files once it is public.
   draft: true
+  # A tag with a suffix, as v0.0.1-rc.1 has, is a pre-release: GitHub's latest release skips it.
+  prerelease: auto
   github:
     owner: shulker-sh
     name: shulker

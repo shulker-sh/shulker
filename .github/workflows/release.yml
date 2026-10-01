@@ -24,12 +24,19 @@ jobs:
       - name: Changelog gate
         run: |
           version="${GITHUB_REF_NAME#v}"
-          if ! grep -qE "^## \[${version}\] - [0-9]{4}-[0-9]{2}-[0-9]{2}" CHANGELOG.md; then
-            echo "::error::CHANGELOG.md is missing a dated '## [${version}] - <date>' entry for ${GITHUB_REF_NAME}"
-            exit 1
-          fi
+          section="$version"
+          case "$version" in
+            # A pre-release ships what is still under Unreleased, so it needs no dated entry of its own.
+            *-*) section="Unreleased" ;;
+            *)
+              if ! grep -qE "^## \[${version}\] - [0-9]{4}-[0-9]{2}-[0-9]{2}" CHANGELOG.md; then
+                echo "::error::CHANGELOG.md is missing a dated '## [${version}] - <date>' entry for ${GITHUB_REF_NAME}"
+                exit 1
+              fi
+              ;;
+          esac
           # Write notes outside the repo so GoReleaser doesn't see a dirty tree.
-          scripts/extract-changelog.sh "$version" > "$RUNNER_TEMP/RELEASE_NOTES.md"
+          scripts/extract-changelog.sh "$section" > "$RUNNER_TEMP/RELEASE_NOTES.md"
           if ! grep -q '[^[:space:]]' "$RUNNER_TEMP/RELEASE_NOTES.md"; then
             echo "::error::extracted release notes are empty for ${GITHUB_REF_NAME}"
             exit 1
