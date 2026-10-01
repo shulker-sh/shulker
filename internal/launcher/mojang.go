@@ -49,6 +49,22 @@ var mojangEntry = &Entry{
 	relink: relinkLauncher, forget: forgetMojang, name: mojangName, gameDirs: mojangGameDirs,
 	readSlots: readMojangSlots, writeSlots: writeMojangSlots, slotFile: mojangSlotFile,
 	place: placeMojang, link: linkMojang,
+	detect: detectMojang,
+}
+
+// detectMojang knows a game directory by where placeMojang puts one, and by the profile shulker
+// wrote for it, since the folder alone could be anyone's.
+func detectMojang(gameDir string) (string, bool) {
+	parent := filepath.Dir(gameDir)
+	if filepath.Base(parent) != "shulker" {
+		return "", false
+	}
+	dir := filepath.Dir(parent)
+	_, profiles, err := (&Mojang{Dir: dir}).readProfiles()
+	if err != nil || len(shulkerProfiles(profiles, gameDir)) == 0 {
+		return "", false
+	}
+	return dir, true
 }
 
 type Mojang struct {

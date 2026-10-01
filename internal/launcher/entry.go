@@ -4,7 +4,6 @@
 package launcher
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -101,6 +100,9 @@ type Entry struct {
 	// locate settles the launcher directory a link works in, for a launcher that reaches its own
 	// files through a resolved path; nil means the directory as given.
 	locate func(dir string) (string, error)
+	// detect says whether the launcher owns a game directory, going by the layout around it, and
+	// names the launcher directory when the layout gives that away too.
+	detect func(gameDir string) (launcherDir string, ok bool)
 	// running says whether the launcher is open, for a launcher that can tell.
 	running func() (running, detectable bool)
 	place   func(e *Entry, req *Link) (Placement, error)
@@ -387,45 +389,13 @@ func RefreshRow(old, in config.Instance) config.Instance {
 // directory when the layout gives it away. It reads an instance registered
 // before shulker recorded a launcher, or one a plain `sync --into` found.
 func Detect(gameDir string) (name, dir string) {
-	if filepath.Base(gameDir) == GDLauncherGameDir {
-		instanceDir := filepath.Dir(gameDir)
-		if instances := filepath.Dir(instanceDir); filepath.Base(instances) == "instances" {
-			if _, err := os.Stat(filepath.Join(instanceDir, GDLauncherInstanceFile)); err == nil {
-				return "gdlauncher", filepath.Dir(instances)
-			}
+	for _, e := range All {
+		if e.detect == nil {
+			continue
+		}
+		if dir, ok := e.detect(gameDir); ok {
+			return e.Name, dir
 		}
 	}
-	if instances := filepath.Dir(gameDir); filepath.Base(instances) == "instances" {
-		if _, err := os.Stat(filepath.Join(gameDir, ATLauncherInstanceFile)); err == nil {
-			return "atlauncher", filepath.Dir(instances)
-		}
-	}
-	if base := filepath.Base(gameDir); base != "minecraft" && base != ".minecraft" {
-		return "", ""
-	}
-	instanceDir := filepath.Dir(gameDir)
-	if _, err := os.Stat(filepath.Join(instanceDir, PrismPackFile)); err != nil {
-		return "", ""
-	}
-	cfg, err := os.ReadFile(filepath.Join(instanceDir, PrismInstanceFile))
-	if err != nil {
-		return "", ""
-	}
-	instances := filepath.Dir(instanceDir)
-	if filepath.Base(instances) == "instances" {
-		dir = filepath.Dir(instances)
-	}
-	if dir != "" {
-		if _, err := os.Stat(filepath.Join(dir, "prismlauncher.cfg")); err == nil {
-			return "prism", dir
-		}
-		if _, err := os.Stat(filepath.Join(dir, "multimc.cfg")); err == nil {
-			return "multimc", dir
-		}
-	}
-	// Prism needs ConfigVersion to parse instance.cfg at all; MultiMC has no such key.
-	if bytes.Contains(cfg, []byte("ConfigVersion")) {
-		return "prism", dir
-	}
-	return "multimc", dir
+	return "", ""
 }

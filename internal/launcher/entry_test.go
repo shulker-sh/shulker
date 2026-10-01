@@ -86,6 +86,58 @@ func TestRefreshRowKeepsTheOldRowsIdentityAndDetectsAMissingLauncher(t *testing.
 	}
 }
 
+func TestDetectKnowsEveryLaunchersLayout(t *testing.T) {
+	write := func(path, data string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	root := t.TempDir()
+	dirs := map[string]string{}
+	for _, name := range []string{"prism", "multimc", "portable", "atlauncher", "gdlauncher", "mojang"} {
+		dirs[name] = filepath.Join(root, name)
+	}
+
+	write(filepath.Join(dirs["prism"], "prismlauncher.cfg"), "")
+	write(filepath.Join(dirs["prism"], "instances", "smp", PrismPackFile), "{}")
+	write(filepath.Join(dirs["prism"], "instances", "smp", PrismInstanceFile), "[General]\n")
+	write(filepath.Join(dirs["multimc"], "multimc.cfg"), "")
+	write(filepath.Join(dirs["multimc"], "instances", "smp", MultiMCPackFile), "{}")
+	write(filepath.Join(dirs["multimc"], "instances", "smp", MultiMCInstanceFile), "ConfigVersion=1.2\n")
+	write(filepath.Join(dirs["portable"], "elsewhere", "smp", MultiMCPackFile), "{}")
+	write(filepath.Join(dirs["portable"], "elsewhere", "smp", MultiMCInstanceFile), "name=SMP\n")
+	write(filepath.Join(dirs["atlauncher"], "instances", "SMP", ATLauncherInstanceFile), "{}")
+	write(filepath.Join(dirs["gdlauncher"], "instances", "SMP", GDLauncherInstanceFile), "{}")
+	mojangGame := filepath.Join(dirs["mojang"], "shulker", "smp")
+	strangerGame := filepath.Join(dirs["mojang"], "shulker", "stranger")
+	if err := os.MkdirAll(strangerGame, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	m := &Mojang{Dir: dirs["mojang"]}
+	if err := m.WriteProfile(Profile{Key: "shulker-smp", Name: "SMP", VersionID: "26.2", GameDir: mojangGame}); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range []struct{ gameDir, name, dir string }{
+		{filepath.Join(dirs["prism"], "instances", "smp", "minecraft"), "prism", dirs["prism"]},
+		{filepath.Join(dirs["multimc"], "instances", "smp", ".minecraft"), "multimc", dirs["multimc"]},
+		{filepath.Join(dirs["portable"], "elsewhere", "smp", "minecraft"), "multimc", ""},
+		{filepath.Join(dirs["atlauncher"], "instances", "SMP"), "atlauncher", dirs["atlauncher"]},
+		{filepath.Join(dirs["gdlauncher"], "instances", "SMP", GDLauncherGameDir), "gdlauncher", dirs["gdlauncher"]},
+		{mojangGame, "mojang", dirs["mojang"]},
+		{strangerGame, "", ""},
+		{root, "", ""},
+	} {
+		if name, dir := Detect(tc.gameDir); name != tc.name || dir != tc.dir {
+			t.Errorf("Detect(%s) = %q %q, want %q %q", tc.gameDir, name, dir, tc.name, tc.dir)
+		}
+	}
+}
+
 func TestOwnedIsShulkersInstancesOfAProjectButNotTheProjectItself(t *testing.T) {
 	registry := []config.Instance{
 		{ID: "smp", Launcher: "shulker", Dir: "/data/instances/smp", Source: "/packs/smp"},

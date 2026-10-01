@@ -61,6 +61,22 @@ var gdlauncherEntry = &Entry{
 	locate: filepath.EvalSymlinks, running: GDLauncherRunning,
 	place: placeGDLauncher, link: linkGDLauncher, after: gdlauncherAfter,
 	Accounts: gdlauncherAccounts, WindowsAppData: filepath.Join("gdlauncher_carbon", "data"),
+	detect: detectGDLauncher,
+}
+
+func detectGDLauncher(gameDir string) (string, bool) {
+	if filepath.Base(gameDir) != GDLauncherGameDir {
+		return "", false
+	}
+	instanceDir := filepath.Dir(gameDir)
+	instances := filepath.Dir(instanceDir)
+	if filepath.Base(instances) != "instances" {
+		return "", false
+	}
+	if _, err := os.Stat(filepath.Join(instanceDir, GDLauncherInstanceFile)); err != nil {
+		return "", false
+	}
+	return filepath.Dir(instances), true
 }
 
 type GDLauncher struct {

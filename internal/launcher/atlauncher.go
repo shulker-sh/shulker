@@ -46,9 +46,21 @@ var atlauncherEntry = &Entry{
 	readSlots: readATLauncherSlots, writeSlots: writeATLauncherSlots, slotFile: instanceFileIn(ATLauncherInstanceFile),
 	place: placeATLauncher, link: linkATLauncher,
 	Accounts: atlauncherAccounts, WindowsAppData: "ATLauncher",
+	detect: detectATLauncher,
 	after: func(e *Entry, _ InstanceResult) string {
 		return "restart " + e.Title + " if it is open so the instance shows up"
 	},
+}
+
+func detectATLauncher(gameDir string) (string, bool) {
+	instances := filepath.Dir(gameDir)
+	if filepath.Base(instances) != "instances" {
+		return "", false
+	}
+	if _, err := os.Stat(filepath.Join(gameDir, ATLauncherInstanceFile)); err != nil {
+		return "", false
+	}
+	return filepath.Dir(instances), true
 }
 
 type ATLauncher struct {

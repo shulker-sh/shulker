@@ -37,6 +37,7 @@ var multimcEntry = &Entry{
 	readSlots: readMultiMCSlots, writeSlots: writeMultiMCSlots, slotFile: instanceFileIn(MultiMCInstanceFile),
 	place: placeMultiMC, link: linkMultiMC, after: restartIfUpdated,
 	Accounts: prismAccounts,
+	detect:   detectMultiMC,
 }
 
 type MultiMC struct {
@@ -49,6 +50,13 @@ type MultiMCInstance struct {
 	Minecraft     string
 	LoaderType    string
 	LoaderVersion string
+}
+
+// detectMultiMC takes whatever has the shared layout and isn't Prism's, so it has to be asked after
+// Prism.
+func detectMultiMC(gameDir string) (string, bool) {
+	dir, _, ok := mmcLayout(gameDir)
+	return dir, ok
 }
 
 func multimcName(e *Entry, _, gameDir string) string {

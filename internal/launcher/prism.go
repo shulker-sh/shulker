@@ -36,6 +36,7 @@ var prismEntry = &Entry{
 	relink: relinkLauncher, forget: forgetInstance, name: prismName, gameDirs: prismGameDirs,
 	readSlots: readPrismSlots, writeSlots: writePrismSlots, slotFile: instanceFileIn(PrismInstanceFile),
 	place: placePrism, link: linkPrism, after: restartIfUpdated,
+	detect: detectPrism,
 }
 
 type Prism struct {
@@ -74,6 +75,43 @@ func DefaultPrismDir() (string, error) {
 		}
 		return filepath.Join(home, ".local", "share", "PrismLauncher"), nil
 	}
+}
+
+func detectPrism(gameDir string) (string, bool) {
+	dir, cfg, ok := mmcLayout(gameDir)
+	if !ok {
+		return "", false
+	}
+	if dir != "" {
+		if _, err := os.Stat(filepath.Join(dir, "prismlauncher.cfg")); err == nil {
+			return dir, true
+		}
+		if _, err := os.Stat(filepath.Join(dir, "multimc.cfg")); err == nil {
+			return "", false
+		}
+	}
+	// Prism needs ConfigVersion to parse instance.cfg at all; MultiMC has no such key.
+	return dir, bytes.Contains(cfg, []byte("ConfigVersion"))
+}
+
+// mmcLayout reads the instance layout Prism and MultiMC share around a game directory: the
+// launcher directory, when the instance sits in its instances folder, and the instance.cfg.
+func mmcLayout(gameDir string) (launcherDir string, cfg []byte, ok bool) {
+	if base := filepath.Base(gameDir); base != "minecraft" && base != ".minecraft" {
+		return "", nil, false
+	}
+	instanceDir := filepath.Dir(gameDir)
+	if _, err := os.Stat(filepath.Join(instanceDir, PrismPackFile)); err != nil {
+		return "", nil, false
+	}
+	cfg, err := os.ReadFile(filepath.Join(instanceDir, PrismInstanceFile))
+	if err != nil {
+		return "", nil, false
+	}
+	if instances := filepath.Dir(instanceDir); filepath.Base(instances) == "instances" {
+		launcherDir = filepath.Dir(instances)
+	}
+	return launcherDir, cfg, true
 }
 
 func prismName(e *Entry, _, gameDir string) string {
