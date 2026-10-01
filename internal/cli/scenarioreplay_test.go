@@ -193,18 +193,40 @@ type replay struct {
 func newReplay(rec *recording) (*replay, error) {
 	r := &replay{rec: rec, responses: map[string]exchange{}, files: map[string]*rebuilt{}, liveFiles: map[string][]byte{}}
 	var all []*rebuilt
-	for _, f := range rec.Files {
-		b, err := rebuild(f.fileHashes, f.Jar)
+	add := func(f recordedFile, j recordedJar) error {
+		b, err := rebuild(f.fileHashes, j)
 		if err != nil {
-			return nil, fmt.Errorf("%s: %w", f.URL, err)
+			return fmt.Errorf("%s: %w", f.URL, err)
 		}
-		nested, err := nestedRebuilt(f.Jar)
+		nested, err := nestedRebuilt(j)
 		if err != nil {
-			return nil, fmt.Errorf("%s: %w", f.URL, err)
+			return fmt.Errorf("%s: %w", f.URL, err)
 		}
 		r.files[f.URL] = b
 		all = append(all, b)
 		all = append(all, nested...)
+		return nil
+	}
+	// A Modrinth pack's index names its files by the hashes they download with, so it is rebuilt
+	// once every other file is, naming theirs.
+	var packs []recordedFile
+	for _, f := range rec.Files {
+		if _, ok := f.Jar.Files["modrinth.index.json"]; ok {
+			packs = append(packs, f)
+			continue
+		}
+		if err := add(f, f.Jar); err != nil {
+			return nil, err
+		}
+	}
+	files := newRewriter(all)
+	for _, f := range packs {
+		j := f.Jar
+		j.Files = maps.Clone(j.Files)
+		j.Files["modrinth.index.json"] = files.rewrite(j.Files["modrinth.index.json"])
+		if err := add(f, j); err != nil {
+			return nil, err
+		}
 	}
 	rw := newRewriter(all)
 	r.rw = rw
@@ -332,7 +354,7 @@ func sortLookups(v any) {
 // sizeKeys and fingerprintKeys are the keys whose numbers are a file's size or fingerprint, in
 // any service's responses, and in the fingerprint lookup CurseForge takes.
 var (
-	sizeKeys        = []string{"size", "fileLength", "fileSizeOnDisk"}
+	sizeKeys        = []string{"size", "fileLength", "fileSizeOnDisk", "fileSize"}
 	fingerprintKeys = []string{"fileFingerprint", "fingerprints"}
 )
 
@@ -506,5 +528,34 @@ func TestReplaySwapsHashesInURLs(t *testing.T) {
 	key, _ := requestKey("GET", "https://api.modrinth.com/v2/version_file/"+rebuiltSha1, "")
 	if _, ok := r.responses[key]; !ok {
 		t.Fatal("a lookup by the rebuilt hash is not in the replay")
+	}
+}
+
+func TestReplayNamesRebuiltFilesInAModrinthPackIndex(t *testing.T) {
+	jar := recordedJar{Files: map[string]string{"fabric.mod.json": `{"id":"x"}`}}
+	real := fileHashes{Sha1: strings.Repeat("a", 40), Sha512: strings.Repeat("a", 128), Size: 9}
+	index := `{"files":[{"path":"mods/x.jar","hashes":{"sha1":"` + real.Sha1 + `","sha512":"` + real.Sha512 + `"},"downloads":["https://cdn.modrinth.com/x.jar"],"fileSize":9}]}`
+	pack := recordedJar{Files: map[string]string{"modrinth.index.json": index}}
+	rec := &recording{Files: []recordedFile{
+		{URL: "https://cdn.modrinth.com/pack.mrpack", fileHashes: fileHashes{Sha1: strings.Repeat("b", 40), Sha512: strings.Repeat("b", 128)}, Jar: pack},
+		{URL: "https://cdn.modrinth.com/x.jar", fileHashes: real, Jar: jar},
+	}}
+	r, err := newReplay(rec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	arc, err := zip.NewReader(bytes.NewReader(r.files["https://cdn.modrinth.com/pack.mrpack"].data), int64(len(r.files["https://cdn.modrinth.com/pack.mrpack"].data)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := arc.Open("modrinth.index.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, _ := io.ReadAll(f)
+	data, _ := jar.build()
+	h := hashesOf(data)
+	if !strings.Contains(string(got), h.Sha512) || !strings.Contains(string(got), h.Sha1) || !strings.Contains(string(got), fmt.Sprintf(`"fileSize":%d`, h.Size)) {
+		t.Fatalf("the index doesn't name the rebuilt jar's hashes and size: %s", got)
 	}
 }
