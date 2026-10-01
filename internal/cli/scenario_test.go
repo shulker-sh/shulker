@@ -2,17 +2,26 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
+	"flag"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/loader"
 )
 
-const scenariosDir = "testdata/scenarios"
+const (
+	scenariosDir = "testdata/scenarios"
+	// scenarioBudget is the most a scenario's recording may take, gzipped.
+	scenarioBudget = 1 << 20
+)
 
 // scenario is a scenario.json: commands run back to back on one project, each checked through
 // its --json output.
@@ -26,7 +35,14 @@ type scenarioStep struct {
 	Reject json.RawMessage `json:"reject,omitempty"`
 }
 
+var (
+	recordFlag  = flag.Bool("record", false, "fill each scenario's recording with what the live services answer to requests it lacks; needs SHULKER_CURSEFORGE_KEY")
+	replaceFlag = flag.Bool("replace", false, "with -record, record the scenarios named by -run wholesale")
+	liveFlag    = flag.Bool("live", false, "run each scenario against the live services, writing its recording to a temp dir; needs SHULKER_CURSEFORGE_KEY")
+)
+
 func TestScenarios(t *testing.T) {
+	key := scenarioKey(t)
 	entries, err := os.ReadDir(scenariosDir)
 	if err != nil {
 		t.Fatal(err)
@@ -35,29 +51,145 @@ func TestScenarios(t *testing.T) {
 		if !e.IsDir() {
 			continue
 		}
-		t.Run(e.Name(), func(t *testing.T) { replayScenario(t, filepath.Join(scenariosDir, e.Name())) })
+		t.Run(e.Name(), func(t *testing.T) {
+			dir := filepath.Join(scenariosDir, e.Name())
+			switch {
+			case *liveFlag:
+				out, err := os.MkdirTemp("", "shulker-scenario-"+e.Name()+"-")
+				if err != nil {
+					t.Fatal(err)
+				}
+				recordScenario(t, dir, out, key, true)
+			case *recordFlag:
+				recordScenario(t, dir, dir, key, *replaceFlag)
+			default:
+				replayScenario(t, dir, filepath.Join(dir, "responses.json.gz"))
+			}
+		})
 	}
 }
 
-// replayScenario runs every step of the scenario in dir, returning the harness it ran on.
-func replayScenario(t *testing.T, dir string) *harness {
+// scenarioKey checks the recording flags and returns the CurseForge key a recording or live run
+// needs, failing before any scenario starts without one.
+func scenarioKey(t *testing.T) string {
+	t.Helper()
+	switch {
+	case *replaceFlag && !*recordFlag:
+		t.Fatal("-replace goes with -record")
+	case *recordFlag && *liveFlag:
+		t.Fatal("-record and -live can't go together: -live leaves the recordings alone")
+	case !*recordFlag && !*liveFlag:
+		return ""
+	}
+	if *replaceFlag {
+		test, name, _ := strings.Cut(flag.Lookup("test.run").Value.String(), "/")
+		if !strings.Contains(test, "TestScenarios") || strings.Trim(name, "^$") == "" {
+			t.Fatal("-replace records a scenario wholesale, so name it: -run 'TestScenarios/<name>'")
+		}
+	}
+	key := os.Getenv("SHULKER_CURSEFORGE_KEY")
+	if key == "" {
+		t.Fatal("recording reaches CurseForge, so it needs SHULKER_CURSEFORGE_KEY")
+	}
+	return key
+}
+
+// recordScenario runs the scenario in dir against its recording, fetching live whatever the
+// recording lacks, or everything when fresh, and writes the recording to outDir even when a step
+// fails. It then replays what it wrote, which proves the recording complete.
+func recordScenario(t *testing.T, dir, outDir, key string, fresh bool) {
 	t.Helper()
 	var sc scenario
 	readScenarioFile(t, filepath.Join(dir, "scenario.json"), &sc)
-	h := newReplayHarness(t, dir)
-	for i, step := range sc.Steps {
-		if err := h.runStep(t, step); err != nil {
-			t.Fatalf("step %d %v: %v", i+1, step.Run, err)
+	rec := &recording{Recorded: time.Now().UTC().Truncate(time.Second)}
+	if !fresh {
+		existing, err := readRecording(filepath.Join(dir, "responses.json.gz"))
+		switch {
+		case err == nil:
+			rec = existing
+		case !errors.Is(err, fs.ErrNotExist):
+			t.Fatal(err)
 		}
+	}
+	r, err := newReplay(rec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.live = liveClient()
+	h := newScenarioHarness(t, r, rec.Recorded)
+	h.curseForgeKey = key
+	failed := runSteps(t, h, sc)
+	out := filepath.Join(outDir, "responses.json.gz")
+	if err := writeRecording(out, r.rec, key); err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("wrote %s", out)
+	if err := withinBudget(out, r.rec); err != nil {
+		t.Error(err)
+	}
+	if failed != nil {
+		t.Fatal(failed)
+	}
+	replayScenario(t, dir, out)
+}
+
+// withinBudget fails a recording over the 1 MB a scenario may take, naming its largest responses.
+func withinBudget(path string, rec *recording) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if info.Size() <= scenarioBudget {
+		return nil
+	}
+	type entry struct {
+		url  string
+		size int
+	}
+	var entries []entry
+	for _, ex := range rec.Exchanges {
+		entries = append(entries, entry{ex.Method + " " + ex.URL, len(ex.Body) + len(ex.BodyBytes)})
+	}
+	for _, f := range rec.Files {
+		data, _ := json.Marshal(f.Jar)
+		entries = append(entries, entry{"file " + f.URL, len(data)})
+	}
+	slices.SortFunc(entries, func(a, b entry) int { return b.size - a.size })
+	var largest []string
+	for _, e := range entries[:min(10, len(entries))] {
+		largest = append(largest, fmt.Sprintf("  %d bytes  %s", e.size, e.url))
+	}
+	return fmt.Errorf("%s is %d bytes gzipped, over the %d a scenario may take; the largest, before gzip:\n%s", path, info.Size(), scenarioBudget, strings.Join(largest, "\n"))
+}
+
+// replayScenario runs every step of the scenario in dir against the recording at path, returning
+// the harness it ran on.
+func replayScenario(t *testing.T, dir, path string) *harness {
+	t.Helper()
+	var sc scenario
+	readScenarioFile(t, filepath.Join(dir, "scenario.json"), &sc)
+	h := newReplayHarness(t, path)
+	if err := runSteps(t, h, sc); err != nil {
+		t.Fatal(err)
 	}
 	return h
 }
 
-// newReplayHarness is a harness whose every request the scenario's recording answers, with the
-// real loader table and the clock at the recording's time.
-func newReplayHarness(t *testing.T, dir string) *harness {
+// runSteps runs the scenario's steps in order, stopping at the first that fails.
+func runSteps(t *testing.T, h *harness, sc scenario) error {
 	t.Helper()
-	rec, err := readRecording(filepath.Join(dir, "responses.json.gz"))
+	for i, step := range sc.Steps {
+		if err := h.runStep(t, step); err != nil {
+			return fmt.Errorf("step %d %v: %w", i+1, step.Run, err)
+		}
+	}
+	return nil
+}
+
+// newReplayHarness is a harness whose every request the recording at path answers.
+func newReplayHarness(t *testing.T, path string) *harness {
+	t.Helper()
+	rec, err := readRecording(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,11 +197,18 @@ func newReplayHarness(t *testing.T, dir string) *harness {
 	if err != nil {
 		t.Fatal(err)
 	}
+	return newScenarioHarness(t, r, rec.Recorded)
+}
+
+// newScenarioHarness is a harness r answers every request for, with the real loader table and the
+// clock at now.
+func newScenarioHarness(t *testing.T, r *replay, now time.Time) *harness {
+	t.Helper()
 	real := loader.All
 	h := newHarness(t)
 	loader.All = real
 	h.replay = r
-	h.now = rec.Recorded
+	h.now = now
 	return h
 }
 
@@ -77,6 +216,9 @@ func newReplayHarness(t *testing.T, dir string) *harness {
 func (h *harness) runStep(t *testing.T, step scenarioStep) error {
 	t.Helper()
 	_, stdout, stderr := h.run(t, step.Run...)
+	if h.replay.live != nil {
+		t.Logf("%v:\n%s", step.Run, stdout)
+	}
 	if misses := h.replay.takeMisses(); len(misses) > 0 {
 		return fmt.Errorf("not in the recording: %s\nstderr: %s", strings.Join(misses, ", "), stderr)
 	}
@@ -100,7 +242,7 @@ func readScenarioFile(t *testing.T, path string, v any) {
 // TestScenarioBudget holds the recordings to the size the repo carries: 1 MB a scenario and 8 MB
 // for the set.
 func TestScenarioBudget(t *testing.T) {
-	const perScenario, total = 1 << 20, 8 << 20
+	const total = 8 << 20
 	recordings, err := filepath.Glob(filepath.Join(scenariosDir, "*", "responses.json.gz"))
 	if err != nil {
 		t.Fatal(err)
@@ -114,8 +256,8 @@ func TestScenarioBudget(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if info.Size() > perScenario {
-			t.Errorf("%s is %d bytes, over the %d a scenario may take", path, info.Size(), perScenario)
+		if info.Size() > scenarioBudget {
+			t.Errorf("%s is %d bytes, over the %d a scenario may take", path, info.Size(), scenarioBudget)
 		}
 		sum += info.Size()
 	}
@@ -125,7 +267,8 @@ func TestScenarioBudget(t *testing.T) {
 }
 
 func TestReplayServesRebuiltJars(t *testing.T) {
-	h := replayScenario(t, filepath.Join(scenariosDir, "fabric-add"))
+	dir := filepath.Join(scenariosDir, "fabric-add")
+	h := replayScenario(t, dir, filepath.Join(dir, "responses.json.gz"))
 	jar := h.replay.files["https://cdn.modrinth.com/data/AANobbMI/versions/u1OEbNKx/sodium-fabric-0.6.0%2Bmc1.21.1.jar"]
 	var l struct {
 		Mods map[string]struct {
@@ -143,7 +286,7 @@ func TestReplayServesRebuiltJars(t *testing.T) {
 }
 
 func TestReplayMissNamesMethodAndPath(t *testing.T) {
-	h := newReplayHarness(t, filepath.Join(scenariosDir, "fabric-add"))
+	h := newReplayHarness(t, filepath.Join(scenariosDir, "fabric-add", "responses.json.gz"))
 	if err := h.runStep(t, scenarioStep{Run: []string{"create", "--fabric", "--minecraft", "1.21.1", "--json"}}); err != nil {
 		t.Fatal(err)
 	}

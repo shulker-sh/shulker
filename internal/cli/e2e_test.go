@@ -152,6 +152,8 @@ type harness struct {
 	installerFetchedClient bool
 	// replay, when set, answers every request in place of the fakes, at the services' real URLs.
 	replay *replay
+	// curseForgeKey replaces the test key, for a run that reaches the real CurseForge.
+	curseForgeKey string
 }
 
 // watch stands in for the watcher process, because a test binary re-execed is a test binary and not
@@ -838,6 +840,9 @@ func (h *harness) newApp(stdout, stderr io.Writer) *app {
 	key := curseForgeTestKey
 	if h.noCurseForge {
 		key = ""
+	}
+	if h.curseForgeKey != "" {
+		key = h.curseForgeKey
 	}
 	cf := curseforge.New(f, key)
 	cf.BaseURL = h.at(cf.BaseURL, "/curseforge")
