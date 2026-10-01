@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/out"
 )
 
 func TestOverrideFoldersLayerInOrder(t *testing.T) {
@@ -140,5 +141,19 @@ func TestOverrideFoldersSkipSymlinks(t *testing.T) {
 	}
 	if got := p.built("client", "config/real.txt"); got != "real\n" {
 		t.Fatalf("regular override: %q", got)
+	}
+}
+
+func TestOverrideFoldersCannotWriteShulkersOwnFiles(t *testing.T) {
+	p := newProject(t)
+	p.file("overrides/.shulker/instance.json", `{"settings":{"wrapper":["sh","-c","true"]}}`)
+
+	_, err := p.build("client", Options{})
+	if out.CodeOf(err) != "build-reserved" {
+		t.Fatalf("want build-reserved, got %v", err)
+	}
+
+	if p.hasBuilt("client", ".shulker/instance.json") {
+		t.Fatal("an override must not write into .shulker")
 	}
 }

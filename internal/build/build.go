@@ -776,6 +776,9 @@ func (b *Builder) layFile(l overrideLayer, path, rel string, data []byte, whole 
 	if !filepath.IsLocal(filepath.FromSlash(rel)) {
 		return security.Refusal(security.Paths, out.Errorf("path-outside", "%s/%s is outside its folder", l.label, rel))
 	}
+	if top, _, _ := strings.Cut(rel, "/"); top == instance.Dir {
+		return security.Refusal(security.Paths, out.Errorf("build-reserved", "%s/%s would write into %s, which holds shulker's own files for an instance", l.label, rel, instance.Dir))
+	}
 	var err error
 	src := source{origin: path, pack: l.pack, feature: l.feature}
 	if strings.HasSuffix(rel, TemplateSuffix) {
