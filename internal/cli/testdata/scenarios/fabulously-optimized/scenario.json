@@ -1,0 +1,17 @@
+{
+  "steps": [
+    {
+      "run": ["import", "https://modrinth.com/modpack/fabulously-optimized/version/ssWn7YI0", "--json"],
+      "expect": {
+        "ok": true,
+        "warnings": ["config_manager: side taken from the pack (server → both)"],
+        "data": {
+          "version": "14.1.0",
+          "mods": {"sides": [{"id": "config_manager", "pack": "both"}], "seeded": {"config/modpack_defaults": ["config/bettergrass.json"]}},
+          "overrides": ["overrides/config/fabric_loader_dependencies.json"]
+        }
+      },
+      "reject": {"data": {"overrides": ["overrides/config/fabric_loader_dependencies.json", "overrides/config/fabric_loader_dependencies.json"]}}
+    }
+  ]
+}
