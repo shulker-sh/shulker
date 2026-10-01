@@ -16,6 +16,7 @@ import (
 
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/out"
 )
 
 func TestServerJarsFollowTheForgeVersion(t *testing.T) {
@@ -187,6 +188,10 @@ func TestInstallServerRunsTheLockedInstallerOffline(t *testing.T) {
 			return nil
 		}
 		lk := &lock.Lock{Minecraft: "26.2", Loader: lock.Loader{Type: name, Version: "1", Server: &lock.ServerJar{Sha512: sha}}}
+		if row := Running(lk); row.installerURL != nil {
+			lk.Loader.Server.URL = row.installerURL(r, lk.Minecraft, lk.Loader.Version)
+		}
+
 		if err := Running(lk).InstallServer(context.Background(), r, lk, "/srv", "/usr/bin/java"); err != nil {
 			t.Fatal(err)
 		}
@@ -234,5 +239,78 @@ func TestInstallClientLocksTheInstallerOnce(t *testing.T) {
 	lk.Loader.Client, lk.Loader.Server = nil, &lock.ServerJar{URL: want.URL, Sha512: want.Sha512}
 	if changed, err := neoforge.InstallClient(ctx, r, lk, "/launcher", "/usr/bin/java"); err != nil || !changed || installer.hits != 1 || !reflect.DeepEqual(lk.Loader.Client, want) {
 		t.Fatalf("a server lock of the same jar is reused: changed %v, %v, %d downloads, %+v", changed, err, installer.hits, lk.Loader.Client)
+	}
+}
+
+func TestInstallerFromAnotherAddressIsRefused(t *testing.T) {
+	r, installer, _, _ := neoforgeRemote(t)
+	r.RunInstaller = func(context.Context, string, string, []string) error {
+		t.Fatal("an installer locked from another address must not run")
+		return nil
+	}
+	ctx := context.Background()
+	sha, err := r.Cache.Put(strings.NewReader("not the installer"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	elsewhere := "https://example.com/neoforge-26.2.0.87-installer.jar"
+	locked := func(l lock.Loader) *lock.Lock {
+		l.Type, l.Version = "neoforge", "26.2.0.87"
+		return &lock.Lock{Minecraft: "26.2", Loader: l}
+	}
+
+	lk := locked(lock.Loader{Client: &lock.Download{URL: elsewhere, Sha512: sha}})
+	if _, err := neoforge.InstallClient(ctx, r, lk, "/launcher", "/usr/bin/java"); out.CodeOf(err) != "provenance-mismatch" {
+		t.Fatalf("client install: want provenance-mismatch, got %v", err)
+	}
+	if _, _, err := neoforge.InstallerVersion(ctx, r, lk); out.CodeOf(err) != "provenance-mismatch" {
+		t.Fatalf("installer version: want provenance-mismatch, got %v", err)
+	}
+
+	lk = locked(lock.Loader{Server: &lock.ServerJar{URL: elsewhere, Sha512: sha}})
+	if _, err := neoforge.EnsureServer(ctx, r, lk); out.CodeOf(err) != "provenance-mismatch" {
+		t.Fatalf("ensure server: want provenance-mismatch, got %v", err)
+	}
+	if err := neoforge.InstallServer(ctx, r, lk, "/srv", "/usr/bin/java"); out.CodeOf(err) != "provenance-mismatch" {
+		t.Fatalf("install server: want provenance-mismatch, got %v", err)
+	}
+	if installer.hits != 0 {
+		t.Fatalf("nothing is downloaded for a refused lock: %d downloads", installer.hits)
+	}
+}
+
+func TestInstallerLibrariesMustBeTheInstallersOwn(t *testing.T) {
+	r, _, _, asm := neoforgeRemote(t)
+	ctx := context.Background()
+	fresh := func() *lock.Lock {
+		lk := &lock.Lock{Minecraft: "26.2", Loader: lock.Loader{Type: "neoforge", Version: "26.2.0.87"}}
+		if _, err := neoforge.EnsureServer(ctx, r, lk); err != nil {
+			t.Fatal(err)
+		}
+		return lk
+	}
+	other, err := r.Cache.Put(strings.NewReader("another jar"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lk := fresh()
+	lk.Loader.Server.Libraries["org.ow2.asm:asm:9.10.1"] = lock.Download{URL: "https://example.com/asm-9.10.1.jar", Sha512: asm.sha512()}
+	if _, err := neoforge.EnsureServer(ctx, r, lk); out.CodeOf(err) != "provenance-mismatch" {
+		t.Fatalf("a library from another address: want provenance-mismatch, got %v", err)
+	}
+
+	lk = fresh()
+	lk.Loader.Server.Libraries["com.example:extra:1"] = lock.Download{URL: "https://example.com/extra-1.jar", Sha512: other}
+	if _, err := neoforge.EnsureServer(ctx, r, lk); out.CodeOf(err) != "provenance-mismatch" {
+		t.Fatalf("a library the installer doesn't list: want provenance-mismatch, got %v", err)
+	}
+
+	lk = fresh()
+	swapped := lk.Loader.Server.Libraries["org.ow2.asm:asm:9.10.1"]
+	swapped.Sha512 = other
+	lk.Loader.Server.Libraries["org.ow2.asm:asm:9.10.1"] = swapped
+	if _, err := neoforge.EnsureServer(ctx, r, lk); out.CodeOf(err) != "checksum-mismatch" {
+		t.Fatalf("other bytes under a listed library: want checksum-mismatch, got %v", err)
 	}
 }

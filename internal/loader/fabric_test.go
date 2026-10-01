@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 
 	"shulker.sh/shulker/internal/cache"
@@ -156,5 +157,18 @@ func TestFabricProvidesJarIsOnItsMaven(t *testing.T) {
 	}
 	if _, _, err := fabric.ProvidesJar(context.Background(), r, "26.3", "0.0.0"); out.CodeOf(err) != "meta-invalid" {
 		t.Fatalf("bad coordinate: %v", err)
+	}
+}
+
+func TestFabricServerLauncherFromAnotherAddressIsRefused(t *testing.T) {
+	r := fakeRemote(t, FabricMetaURL, map[string]any{})
+	sha, err := r.Cache.Put(strings.NewReader("not the launcher"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lk := &lock.Lock{Minecraft: "26.2", Loader: lock.Loader{Type: "fabric", Version: "0.17.3", Server: &lock.ServerJar{Installer: "1.1.2", URL: "https://example.com/server.jar", Sha512: sha}}}
+
+	if _, err := fabric.EnsureServer(context.Background(), r, lk); out.CodeOf(err) != "provenance-mismatch" {
+		t.Fatalf("want provenance-mismatch, got %v", err)
 	}
 }

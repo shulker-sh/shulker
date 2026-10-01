@@ -174,3 +174,25 @@ func TestQuiltServerIsAssembledFromItsProfile(t *testing.T) {
 		t.Fatal("a fresh cache did not regenerate the launch jar")
 	}
 }
+
+func TestQuiltLibraryFromAnotherAddressIsRefused(t *testing.T) {
+	r := fakeRemote(t, QuiltMetaURL, map[string]any{})
+	sha, err := r.Cache.Put(strings.NewReader("not the loader"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	locked := func(url string) *lock.Lock {
+		return &lock.Lock{Minecraft: "26.2", Loader: lock.Loader{Type: "quilt", Version: "0.30.1", Server: &lock.ServerJar{Sha512: sha, Libraries: map[string]lock.Download{
+			"org.quiltmc:quilt-loader:0.30.1": {URL: url, Sha512: sha},
+		}}}}
+	}
+
+	for _, url := range []string{
+		"https://example.com/org/quiltmc/quilt-loader/0.30.1/quilt-loader-0.30.1.jar",
+		r.URLs[QuiltMetaURL] + "/maven/another.jar",
+	} {
+		if _, err := quilt.EnsureServer(context.Background(), r, locked(url)); out.CodeOf(err) != "provenance-mismatch" {
+			t.Fatalf("%s: want provenance-mismatch, got %v", url, err)
+		}
+	}
+}

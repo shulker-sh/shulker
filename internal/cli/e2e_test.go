@@ -686,23 +686,23 @@ func (h *harness) fakeRows(t *testing.T, base string) {
 		{
 			Name: "fabric", Versions: fakeVersions("0.18.0-beta.1", "0.17.3", "0.17.2"),
 			Profile:      profile("fabric-loader-0.17.3-26.2", "net.fabricmc.loader.impl.launch.knot.KnotClient", "net.fabricmc:fabric-loader:0.17.3"),
-			EnsureServer: h.fakeServer("1.1.2", h.serverJar, nil),
+			EnsureServer: h.fakeServer("1.1.2", h.serverJar.filename, h.serverJar, nil),
 		},
 		{
 			Name: "quilt", Versions: fakeVersions("0.20.0-beta.9", "0.30.1", "0.31.0-beta.4", "0.30.0"),
 			Profile:      profile("quilt-loader-0.30.1-26.2", "org.quiltmc.loader.impl.launch.knot.KnotClient", "org.quiltmc:quilt-loader:0.30.1"),
 			ProvidesJar:  base + "/cdn/org/quiltmc/quilt-loader/0.30.1/" + h.quiltLoader.filename,
-			EnsureServer: h.fakeServer("", h.quiltLaunch, map[string]fakeJar{"org.quiltmc:quilt-loader:0.30.1": h.quiltLoader, "net.fabricmc:sponge-mixin:0.17.3": h.mixin}),
+			EnsureServer: h.fakeServer("", h.quiltLaunch.filename, h.quiltLaunch, map[string]fakeJar{"org.quiltmc:quilt-loader:0.30.1": h.quiltLoader, "net.fabricmc:sponge-mixin:0.17.3": h.mixin}),
 		},
 		{
 			Name: "neoforge", Versions: fakeVersions("26.2.0.56-beta", "26.2.0.87"),
 			Installer:    base + "/cdn/net/neoforged/neoforge/26.2.0.87/" + h.neoInstaller.filename,
-			EnsureServer: h.fakeServer("", h.neoInstaller, map[string]fakeJar{"net.neoforged:neoforge:26.2.0.87:universal": h.neoLibs["net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-universal.jar"], "org.ow2.asm:asm:9.10.1": asm}),
+			EnsureServer: h.fakeServer("", "net/neoforged/neoforge/26.2.0.87/"+h.neoInstaller.filename, h.neoInstaller, map[string]fakeJar{"net.neoforged:neoforge:26.2.0.87:universal": h.neoLibs["net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-universal.jar"], "org.ow2.asm:asm:9.10.1": asm}),
 		},
 		{
 			Name: "forge", Versions: fakeVersions("65.0.9", "65.1.3"),
 			Installer:    base + "/cdn/net/minecraftforge/forge/26.2-65.1.3/" + h.forgeInstaller.filename,
-			EnsureServer: h.fakeServer("", h.forgeInstaller, map[string]fakeJar{"net.minecraftforge:forge:26.2-65.1.3:universal": h.forgeLibs["net/minecraftforge/forge/26.2-65.1.3/forge-26.2-65.1.3-universal.jar"], "org.ow2.asm:asm:9.10.1": asm}),
+			EnsureServer: h.fakeServer("", "net/minecraftforge/forge/26.2-65.1.3/"+h.forgeInstaller.filename, h.forgeInstaller, map[string]fakeJar{"net.minecraftforge:forge:26.2-65.1.3:universal": h.forgeLibs["net/minecraftforge/forge/26.2-65.1.3/forge-26.2-65.1.3-universal.jar"], "org.ow2.asm:asm:9.10.1": asm}),
 		},
 	}
 	rows := make([]loader.Loader, len(fakes))
@@ -716,12 +716,12 @@ func (h *harness) fakeRows(t *testing.T, base string) {
 
 // fakeServer is a fake row's server install: it locks jar as loader.server with libs under it,
 // every one on the cdn, and downloads only what the cache lacks.
-func (h *harness) fakeServer(installer string, jar fakeJar, libs map[string]fakeJar) func(context.Context, *loader.Remote, *lock.Lock) (loader.ServerResult, error) {
+func (h *harness) fakeServer(installer, at string, jar fakeJar, libs map[string]fakeJar) func(context.Context, *loader.Remote, *lock.Lock) (loader.ServerResult, error) {
 	return func(ctx context.Context, r *loader.Remote, lk *lock.Lock) (loader.ServerResult, error) {
 		var res loader.ServerResult
 		s := lk.Loader.Server
 		if s == nil {
-			s = &lock.ServerJar{Installer: installer, URL: h.server.URL + "/cdn/" + jar.filename, Sha512: jar.sha512}
+			s = &lock.ServerJar{Installer: installer, URL: h.server.URL + "/cdn/" + at, Sha512: jar.sha512}
 			if len(libs) > 0 {
 				s.Libraries = map[string]lock.Download{}
 			}
@@ -736,7 +736,7 @@ func (h *harness) fakeServer(installer string, jar fakeJar, libs map[string]fake
 			res.ChangedLock = true
 		}
 		if s.URL == "" {
-			s.URL = h.server.URL + "/cdn/" + jar.filename
+			s.URL = h.server.URL + "/cdn/" + at
 			res.ChangedLock = true
 		}
 		downloads := append([]lock.Download{{URL: s.URL, Sha512: s.Sha512}}, slices.Collect(maps.Values(s.Libraries))...)

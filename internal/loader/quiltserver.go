@@ -15,11 +15,14 @@ import (
 
 // quiltEnsureServer assembles a Quilt server from its meta server profile: the libraries it lists
 // and a deterministic launch jar, since Quilt's launcher never downloads anything itself.
-func quiltEnsureServer(ctx context.Context, _ Loader, r *Remote, lk *lock.Lock) (ServerResult, error) {
+func quiltEnsureServer(ctx context.Context, row Loader, r *Remote, lk *lock.Lock) (ServerResult, error) {
 	var res ServerResult
 	q := newQuiltMeta(r)
 	l := &lk.Loader
 	if locked := l.Server; locked != nil && len(locked.Libraries) > 0 {
+		if err := checkMavenLibraries(row, locked, q.mavenURL, q.baseURL, r.url(FabricMavenURL)); err != nil {
+			return res, err
+		}
 		if isServerCached(r.Cache, locked) {
 			return res, nil
 		}

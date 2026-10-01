@@ -8,7 +8,7 @@ import (
 
 // fabricEnsureServer locks Fabric's bundled server launcher, which fetches the loader and its
 // libraries itself on first start, unlocked.
-func fabricEnsureServer(ctx context.Context, _ Loader, r *Remote, lk *lock.Lock) (ServerResult, error) {
+func fabricEnsureServer(ctx context.Context, row Loader, r *Remote, lk *lock.Lock) (ServerResult, error) {
 	var res ServerResult
 	f := newFabricMeta(r)
 	l := &lk.Loader
@@ -30,6 +30,9 @@ func fabricEnsureServer(ctx context.Context, _ Loader, r *Remote, lk *lock.Lock)
 	if l.Server.URL == "" {
 		l.Server.URL = f.serverJarURL(lk.Minecraft, l.Version, l.Server.Installer)
 		res.ChangedLock = true
+	}
+	if want := f.serverJarURL(lk.Minecraft, l.Version, l.Server.Installer); l.Server.URL != want {
+		return res, lockedElsewhere(row, "the server launcher", l.Server.URL)
 	}
 	if r.Cache.Has(l.Server.Sha512) {
 		return res, nil

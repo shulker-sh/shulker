@@ -18,6 +18,9 @@ func (l Loader) InstallServer(ctx context.Context, r *Remote, lk *lock.Lock, dir
 	if l.InstallServerFlag == "" {
 		return nil
 	}
+	if err := l.checkInstallerURL(r, lk, "the server installer", lk.Loader.Server.URL); err != nil {
+		return err
+	}
 	r.log("installing %s %s", l.Name, lk.Loader.Version)
 	return r.RunInstaller(ctx, java, r.Cache.Object(lk.Loader.Server.Sha512), []string{l.InstallServerFlag, dir, "--offline"})
 }
@@ -53,6 +56,9 @@ func (l Loader) clientInstaller(ctx context.Context, r *Remote, lk *lock.Lock) (
 	}
 	locked := &lk.Loader
 	if c := locked.Client; c != nil {
+		if err := l.checkInstallerURL(r, lk, "the client installer", c.URL); err != nil {
+			return "", false, err
+		}
 		path, err := r.Cache.Ensure(ctx, r.Fetch, c.URL, c.Sha512)
 		return path, false, err
 	}
@@ -77,15 +83,24 @@ func installerEnsureServer(ctx context.Context, l Loader, r *Remote, lk *lock.Lo
 	var res ServerResult
 	locked := &lk.Loader
 	if s := locked.Server; s != nil && s.URL != "" {
+		if err := l.checkInstallerURL(r, lk, "the server installer", s.URL); err != nil {
+			return res, err
+		}
 		if isServerCached(r.Cache, s) {
-			return res, nil
+			return res, checkInstallerLibraries(l, r.Cache, s)
 		}
 		r.log("downloading %s server files %s", l.Name, locked.Version)
 		if _, err := r.Cache.Ensure(ctx, r.Fetch, s.URL, s.Sha512); err != nil {
 			return res, err
 		}
 		res.WasFetched = true
-		return res, ensureDownloads(ctx, r, s)
+		if err := checkInstallerLibraries(l, r.Cache, s); err != nil {
+			return res, err
+		}
+		if err := ensureDownloads(ctx, r, s); err != nil {
+			return res, err
+		}
+		return res, checkInstallerLibraries(l, r.Cache, s)
 	}
 	r.log("downloading %s server files (loader %s)", l.Name, locked.Version)
 	url := l.installerURL(r, lk.Minecraft, locked.Version)
