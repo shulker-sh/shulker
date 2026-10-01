@@ -2121,13 +2121,13 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `backup-missing` | `restore` found no backup with that number, or none by the name or at the path `--backup` gives |
 | `backups-empty` | `restore` found no backups for the target |
 | `build-conflict` | Files changed both in the build directory and in the source; run `diff`, or pass `--force` to overwrite, which also resets seeded files. A sync for a launch keeps them instead, and a seeded file never conflicts. `items`: the files |
-| `build-reserved` | A side that builds in place has overrides that would write `shulker.json`, `shulker.lock`, `shulker.local.json`, `.shulker/` or a data directory. `items`: the files |
+| `build-reserved` | A side that builds in place has overrides that would write `shulker.json`, `shulker.lock`, `shulker.local.json`, `.shulker/` or a data directory. `items`: the files. An override that would write into `.shulker/` is refused on every build, in place or not, since an instance's own settings live there |
 | `cache-changed` | A cached file no longer matched its hash, so the build deleted it, and it has no URL to download it from again: a local file or a manual download. `shulker install` puts the locked copy back |
 | `cache-verify-failed` | `cache verify` found a changed object it didn't drop, a file gone from its provider, or one its provider files under another project. `items`: the changed objects' hashes and the flagged files' keys; `data`: the whole report |
 | `cache-root-unreadable` | A registered instance's `shulker.lock`, or a lock file named with `--lock`, is there but can't be read, so `cache prune` stops rather than remove files it may need; `cache info` still reports and names it |
 | `audit-failed` | `audit` found locked files gone from their provider, or entries that download from outside it or that it files under another project. `items`: their keys; `data`: the whole report |
 | `check-failed` | `check` found a problem; each one printed above it. `items`: every problem's items as `<code>: <item>`; `data.problems`: each problem as an error |
-| `checksum-mismatch` | A download's hash isn't the one recorded for it: the sha512 in the lock or from the provider, or the sha1 in a version JSON or Java runtime manifest. Rows show both hashes, and the file at `install` |
+| `checksum-mismatch` | A download's hash isn't the one recorded for it: the sha512 in the lock or from the provider, the sha1 in a version JSON or Java runtime manifest, or the sha1 a loader's installer gives for a library the lock names. Rows show both hashes, and the file at `install` |
 | `class-file` | `audit file` was given a class file, which `audit class` reads instead |
 | `class-invalid` | `audit class` found the class, but it doesn't read as a class file. The row says what went wrong |
 | `class-not-found` | `audit class` found no such class in the jar or any jar nested in it |
@@ -2248,7 +2248,7 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `pack-unknown` | `client.resourcePacks` or `client.shader` names a pack the lock doesn't have, as a pack of a modpack in `requires` can be. Fix the name, or add the pack first |
 | `path-invalid` | `shulker.json`, `config.json` or an instance's settings have no such field, or the path goes inside a single value or a list. `candidates`: the fields allowed there |
 | `path-not-set` | `get`, `config get` or `instance get` names a field that isn't set |
-| `path-outside` | A path a lock, manifest or modpack archive names would leave its folder: a local file, an override, or a git modpack's `path`. The schemas and the archive readers refuse such a path first, so this is a second guard |
+| `path-outside` | A path a lock, manifest or modpack archive names would leave its folder: a local file, an override, a git modpack's `path`, or any file a build is about to write. The schemas and the archive readers refuse such a path first, so this is a second guard |
 | `path-taken` | `import` built the new project, but the folder it goes into has a file where the project has a folder, or the other way round; nothing was moved into it |
 | `pattern-invalid` | `audit grep` was given a pattern that isn't a regular expression in Go's syntax. The row says why |
 | `pin-mismatch` | The pinned version belongs to a different project |
@@ -2259,7 +2259,7 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `player-unresolved` | A player isn't in the lock; run `shulker player` |
 | `players-invalid` | A player entry in `shulker.json` is invalid |
 | `properties-invalid` | `server.properties` keys removed in this Minecraft version, or values that aren't valid, including a `shulker.json` value that can't be written as a property. Unknown keys only warn, with a did-you-mean. `items`: the problems |
-| `provenance-mismatch` | A lock entry names a provider but downloads from a host that isn't one of that provider's, at `build`, `install`, `sync`, `export`, `check files` or a launch. `items`: the entries. Its help says to run `lock <key>` to look each up again, or, for an instance synced from a git or URL source, that the lock is the source's and its author has to fix it; a launch's sync that fails this way leaves the last good build in place and the game starts on it. `lock`, `update`, `pin`, `unpin` and `remove` still accept such a lock, since they're how it gets fixed |
+| `provenance-mismatch` | A lock entry names a provider but downloads from a host that isn't one of that provider's, or the lock's loader installer, server launcher, loader libraries or Minecraft server jar download from anywhere but where the loader or Mojang publishes them, at `build`, `install`, `sync`, `export`, `check files` or a launch. `items`: the entries. Its help says to run `lock <key>` to look each up again, or, for an instance synced from a git or URL source, that the lock is the source's and its author has to fix it; a launch's sync that fails this way leaves the last good build in place and the game starts on it. `lock`, `update`, `pin`, `unpin` and `remove` still accept such a lock, since they're how it gets fixed |
 | `provider-unavailable` | The provider isn't set up, like CurseForge without an API key |
 | `rate-limited` | Modrinth or CurseForge is refusing shulker's requests for making too many; CurseForge refusing a key it has already accepted in the same run counts too. A Modrinth limit that resets within a minute is waited out once first; the help says when to run the command again |
 | `registry-has-instances` | `config set` or `config unset` would move the registry away from instances the new one doesn't have; `--force` changes it anyway. `items`: the directories left behind |

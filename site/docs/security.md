@@ -19,7 +19,7 @@ This page is for both. An agent can read it offline with `shulker docs security`
 | `override-symlinks` | Symlinks in a source's override folders are skipped, so one can't copy a file from elsewhere on your disk, like an SSH key, into an instance. |
 | `https` | Every download, API call and redirect uses https, and every git remote https or ssh. |
 | `mrpack-hosts` | An mrpack downloads only from the hosts Modrinth allows. |
-| `provenance` | A lock entry that names a provider has to download from that provider's own hosts. |
+| `provenance` | A lock entry that names a provider has to download from that provider's own hosts, and the loader's installer and server files from where the loader and Mojang publish them. |
 | `cache-hash` | Every file placed from the cache is checked against its hash, so a copy changed in the cache can't spread to other instances. |
 | `manifest-jvm-args` | A manifest can't add its own flags to the java command line, such as `-javaagent`. |
 | `placed-jars` | A build checks every jar it placed in `mods/` against the locked copy, and warns when one has changed. |
