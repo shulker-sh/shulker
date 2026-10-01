@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -129,8 +130,12 @@ func liveClient() *http.Client {
 // fetchLive asks the real service for a request the recording lacks and adds the answer to it: a
 // zip as a file, served as the real bytes, and anything else as an exchange, served with the
 // recording's own files swapped in like the rest. A HEAD is fetched whole, so the file it asks
-// about is recorded for the ranged reads that follow it.
+// about is recorded for the ranged reads that follow it. A request naming a rebuilt file is
+// refused: the service would answer for a file it never published, and the recording keep that.
 func (r *replay) fetchLive(req *http.Request, u string, body []byte) (exchange, []byte, error) {
+	if r.rw.namesRebuilt(u + "\n" + string(body)) {
+		return exchange{}, nil, errors.New("it names a rebuilt file, which the live service doesn't know; record the scenario again with -replace")
+	}
 	method := req.Method
 	if method == http.MethodHead {
 		method = http.MethodGet
@@ -191,6 +196,43 @@ func (r *replay) fetchLive(req *http.Request, u string, body []byte) (exchange, 
 	served.Body = r.rw.rewrite(ex.Body)
 	r.responses[key] = served
 	return served, nil, nil
+}
+
+// namesRebuilt reports whether s holds a rebuilt file's hash, or its fingerprint as a JSON
+// number, as a lookup the CLI makes from the files it has does.
+func (rw *rewriter) namesRebuilt(s string) bool {
+	for _, f := range rw.files {
+		if strings.Contains(s, f.sha1) || strings.Contains(s, f.sha512) {
+			return true
+		}
+	}
+	_, body, _ := strings.Cut(s, "\n")
+	dec := json.NewDecoder(strings.NewReader(body))
+	dec.UseNumber()
+	var v any
+	if dec.Decode(&v) != nil {
+		return false
+	}
+	var found bool
+	var walk func(any)
+	walk = func(v any) {
+		switch v := v.(type) {
+		case json.Number:
+			for _, f := range rw.files {
+				found = found || v.String() == fmt.Sprint(f.fingerprint)
+			}
+		case []any:
+			for _, child := range v {
+				walk(child)
+			}
+		case map[string]any:
+			for _, child := range v {
+				walk(child)
+			}
+		}
+	}
+	walk(v)
+	return found
 }
 
 // writeRecording writes rec in a fixed order, so recording nothing new writes the same bytes, and
@@ -457,5 +499,38 @@ func TestWritingARecordingRefusesTheKey(t *testing.T) {
 	rec := &recording{Exchanges: []exchange{{Method: "GET", URL: "https://api.curseforge.com/v1/mods/1?key=secret-key", Status: 200}}}
 	if err := writeRecording(filepath.Join(t.TempDir(), "r.json.gz"), rec, "secret-key"); err == nil {
 		t.Fatal("a recording holding the key was written")
+	}
+}
+
+func TestFillingRefusesALookupOfARebuiltFile(t *testing.T) {
+	var hits atomic.Int32
+	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { hits.Add(1) }))
+	defer upstream.Close()
+	jar := recordedJar{Files: map[string]string{"fabric.mod.json": `{"id":"x"}`}}
+	rec := &recording{Files: []recordedFile{{URL: "https://cdn.modrinth.com/x.jar", fileHashes: fileHashes{Sha1: strings.Repeat("a", 40), Sha512: strings.Repeat("a", 128)}, Jar: jar}}}
+	r, err := newReplay(rec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.live = fetchtest.Everything(upstream)
+	front := httptest.NewTLSServer(r)
+	defer front.Close()
+	client := fetchtest.Everything(front)
+	data, _ := jar.build()
+	rebuilt := hashesOf(data)
+	for _, req := range []struct{ url, body string }{
+		{"https://api.modrinth.com/v2/version_file/" + rebuilt.Sha1, ""},
+		{"https://api.modrinth.com/v2/version_files", `{"hashes":["` + rebuilt.Sha512 + `"]}`},
+		{"https://api.curseforge.com/v1/fingerprints", fmt.Sprintf(`{"fingerprints":[%d]}`, rebuilt.Fingerprint)},
+	} {
+		resp, err := client.Post(req.url, "application/json", strings.NewReader(req.body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+	}
+	misses := r.takeMisses()
+	if hits.Load() != 0 || len(misses) != 3 || !strings.Contains(misses[0], "-replace") {
+		t.Fatalf("%d hits, misses %v", hits.Load(), misses)
 	}
 }
