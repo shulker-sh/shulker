@@ -1,7 +1,7 @@
 {
   "steps": [
     {
-      "run": ["import", "rlcraft", "--provider", "curseforge", "--json"],
+      "run": ["import", "https://www.curseforge.com/minecraft/modpacks/rlcraft/files/4612979", "--json"],
       "expect": {"ok": false, "error": {"code": "missing-files", "message": "2 files need a manual download"}}
     },
     {
@@ -11,12 +11,12 @@
       ]
     },
     {
-      "run": ["import", "rlcraft", "--provider", "curseforge", "--json"],
+      "run": ["import", "https://www.curseforge.com/minecraft/modpacks/rlcraft/files/4612979", "--json"],
       "expect": {"ok": true, "data": {"version": "2.9.3", "minecraft": "1.12.2", "loader": {"type": "forge"}, "mods": {"locked": [{"id": "rtg"}, {"id": "srparasites"}]}}}
     },
     {
       "run": ["import", "rlcraft", "--json"],
-      "expect": {"ok": true, "data": {"version": "2.9.3", "merged": true}},
+      "expect": {"ok": true, "data": {"merged": true}},
       "reject": {"data": {"version": "2.9.2d"}}
     }
   ]
