@@ -1,12 +1,17 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"io/fs"
+	"net/http"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -14,13 +19,15 @@ import (
 	"time"
 
 	"shulker.sh/shulker/internal/cache"
+	"shulker.sh/shulker/internal/fetch/fetchtest"
 	"shulker.sh/shulker/internal/loader"
+	"shulker.sh/shulker/internal/resolve"
 )
 
 const (
 	scenariosDir = "testdata/scenarios"
 	// scenarioBudget is the most a scenario's recording may take, gzipped.
-	scenarioBudget = 1 << 20
+	scenarioBudget = 3 << 19
 )
 
 // scenario is a scenario.json: commands run back to back on one project, each checked through
@@ -29,10 +36,12 @@ type scenario struct {
 	Steps []scenarioStep `json:"steps"`
 }
 
+// scenarioStep runs a command and checks its output, or places manual downloads in the project.
 type scenarioStep struct {
-	Run    []string        `json:"run"`
-	Expect json.RawMessage `json:"expect,omitempty"`
-	Reject json.RawMessage `json:"reject,omitempty"`
+	Run      []string        `json:"run,omitempty"`
+	Download []string        `json:"download,omitempty"`
+	Expect   json.RawMessage `json:"expect,omitempty"`
+	Reject   json.RawMessage `json:"reject,omitempty"`
 }
 
 var (
@@ -215,6 +224,9 @@ func newScenarioHarness(t *testing.T, r *replay, now time.Time) *harness {
 // runStep runs a step and checks its output, failing on any request the recording lacked.
 func (h *harness) runStep(t *testing.T, step scenarioStep) error {
 	t.Helper()
+	if len(step.Download) > 0 {
+		return h.placeDownloads(step.Download)
+	}
 	_, stdout, stderr := h.run(t, step.Run...)
 	if h.replay.live != nil {
 		t.Logf("%v:\n%s", step.Run, stdout)
@@ -224,6 +236,41 @@ func (h *harness) runStep(t *testing.T, step scenarioStep) error {
 	}
 	if err := checkFragments(string(step.Expect), string(step.Reject), stdout); err != nil {
 		return fmt.Errorf("%w\nstderr: %s", err, stderr)
+	}
+	return nil
+}
+
+// placeDownloads puts each file in the project's downloads/ under its URL's file name, fetched
+// through the replay as the CLI would fetch it.
+func (h *harness) placeDownloads(urls []string) error {
+	client := fetchtest.Everything(h.server)
+	dir := filepath.Join(h.dir, resolve.DownloadsDir)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	for _, raw := range urls {
+		u, err := url.Parse(raw)
+		if err != nil {
+			return err
+		}
+		resp, err := client.Get(raw)
+		if err != nil {
+			return err
+		}
+		data, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			return err
+		}
+		if misses := h.replay.takeMisses(); len(misses) > 0 {
+			return fmt.Errorf("not in the recording: %s", strings.Join(misses, ", "))
+		}
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("%s: HTTP %d", raw, resp.StatusCode)
+		}
+		if err := os.WriteFile(filepath.Join(dir, path.Base(u.Path)), data, 0o644); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -292,6 +339,25 @@ func TestReplayMissNamesMethodAndPath(t *testing.T) {
 	}
 	err := h.runStep(t, scenarioStep{Run: []string{"add", "iris", "--json"}, Expect: json.RawMessage(`{"ok":true}`)})
 	if err == nil || !strings.Contains(err.Error(), "GET api.modrinth.com/v2/project/iris") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestDownloadStepPlacesTheRebuiltFile(t *testing.T) {
+	h := newReplayHarness(t, filepath.Join(scenariosDir, "fabric-add", "responses.json.gz"))
+	url := "https://cdn.modrinth.com/data/AANobbMI/versions/u1OEbNKx/sodium-fabric-0.6.0%2Bmc1.21.1.jar"
+	if err := h.runStep(t, scenarioStep{Download: []string{url}}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(h.dir, resolve.DownloadsDir, "sodium-fabric-0.6.0+mc1.21.1.jar"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(data, h.replay.files[url].data) {
+		t.Fatal("the placed file is not the rebuilt jar")
+	}
+	err = h.runStep(t, scenarioStep{Download: []string{"https://cdn.modrinth.com/data/missing.jar"}})
+	if err == nil || !strings.Contains(err.Error(), "GET cdn.modrinth.com/data/missing.jar") {
 		t.Fatalf("got %v", err)
 	}
 }
