@@ -227,7 +227,7 @@ func (h *harness) runStep(t *testing.T, step scenarioStep) error {
 	if len(step.Download) > 0 {
 		return h.placeDownloads(step.Download)
 	}
-	_, stdout, stderr := h.run(t, step.Run...)
+	_, stdout, stderr := h.run(t, stepArgs(h.dir, step.Run)...)
 	if h.replay.live != nil {
 		t.Logf("%v:\n%s", step.Run, stdout)
 	}
@@ -238,6 +238,18 @@ func (h *harness) runStep(t *testing.T, step scenarioStep) error {
 		return fmt.Errorf("%w\nstderr: %s", err, stderr)
 	}
 	return nil
+}
+
+// stepArgs are a step's arguments with a relative -C or --dir read inside the project folder dir,
+// where the test's own working directory would put it in the repo.
+func stepArgs(dir string, args []string) []string {
+	args = slices.Clone(args)
+	for i := 1; i < len(args); i++ {
+		if (args[i-1] == "-C" || args[i-1] == "--dir") && !filepath.IsAbs(args[i]) {
+			args[i] = filepath.Join(dir, args[i])
+		}
+	}
+	return args
 }
 
 // placeDownloads puts each file in the project's downloads/ under its URL's file name, fetched
@@ -373,4 +385,12 @@ func sodiumURL(t *testing.T, r *replay) string {
 	}
 	t.Fatal("fabric-add downloads no Sodium jar")
 	return ""
+}
+
+func TestAStepsRelativeDirIsInsideTheProject(t *testing.T) {
+	got := stepArgs("/p", []string{"create", "-C", "quilt", "--dir", "a/b", "--name", "x", "-C", "/abs"})
+	want := []string{"create", "-C", "/p/quilt", "--dir", "/p/a/b", "--name", "x", "-C", "/abs"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
 }
