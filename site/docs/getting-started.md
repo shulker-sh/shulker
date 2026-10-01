@@ -152,3 +152,5 @@ An existing project gains a server side when you add `"server": {}` to its `shul
 - [Concepts](/docs/concepts) explains manifests, locks, sides, modpacks, and instances.
 - The [CLI Reference](/docs/cli) covers every command.
 - The [Manifest Reference](/docs/manifest) lists every field in `shulker.json`.
+- [GitHub Actions](/docs/github-actions) checks a pack on every push and releases it from a tag.
+- [Security](/docs/security) lists what Shulker checks before a file reaches your machine, and how to look into a pack yourself.

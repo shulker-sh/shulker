@@ -161,7 +161,7 @@ CurseForge needs an API key. Release builds include one, so it works without set
 
 ## Cache
 
-Every file Shulker downloads is stored once, by hash, in a cache shared by all your projects, `~/Library/Caches/shulker` on macOS, or wherever `SHULKER_CACHE` points. A build places files out of it, so a mod ten instances use is downloaded once, and installing a pack you have built before needs no network at all.
+Every file Shulker downloads is stored once, by hash, in a cache shared by all your projects, `~/Library/Caches/shulker` on macOS, `~/.cache/shulker` on Linux and `%LOCALAPPDATA%\shulker` on Windows, or wherever `SHULKER_CACHE` points. A build places files out of it, so a mod ten instances use is downloaded once, and installing a pack you have built before needs no network at all.
 
 Nothing Shulker placed is deleted without its bytes reaching the cache first. That is what makes [`shulker rollback`](/docs/cli#shulker-rollback) work offline. A history entry leaves mod and pack files out and relies on the cache to put them back.
 

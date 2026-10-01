@@ -174,7 +174,9 @@ To see the full list of commands, run `shulker --help` or read the [CLI Referenc
 - [Getting Started](https://shulker.sh/docs/getting-started) walks through installation, a first project, playing and serving.
 - [Concepts](https://shulker.sh/docs/concepts) explains manifests, locks, sides, modpacks and instances.
 - The [CLI Reference](https://shulker.sh/docs/cli) covers every command, and the [Manifest Reference](https://shulker.sh/docs/manifest) every field of `shulker.json`.
-- The [changelog](CHANGELOG.md) lists what each release adds.
+- [GitHub Actions](https://shulker.sh/docs/github-actions) checks a pack on every push and releases it from a tag.
+- [Security](https://shulker.sh/docs/security) lists what Shulker checks before a file reaches your machine, and how to look into a pack yourself.
+- The [Changelog](CHANGELOG.md) lists what each release adds.
 
 ## License
 
