@@ -1,0 +1,28 @@
+{
+  "steps": [
+    {
+      "run": ["create", "--fabric", "--minecraft", "26.3", "--json"],
+      "expect": {"ok": true}
+    },
+    {
+      "run": ["add", "jei", "--provider", "curseforge", "--json"],
+      "expect": {"ok": false, "error": {"code": "no-compatible-version"}}
+    },
+    {
+      "run": ["add", "jei", "--provider", "curseforge", "--channel", "beta", "--json"],
+      "expect": {"ok": true, "data": {"added": [{"id": "jei", "provider": "curseforge"}]}}
+    },
+    {
+      "run": ["create", "-C", "quilt", "--quilt", "--minecraft", "26.3", "--json"],
+      "expect": {"ok": true}
+    },
+    {
+      "run": ["add", "-C", "quilt", "jei", "--provider", "curseforge", "--channel", "beta", "--json"],
+      "expect": {"ok": true, "data": {"added": [{"id": "jei"}]}}
+    },
+    {
+      "run": ["create", "-C", "neoforge", "--neoforge", "--minecraft", "26.3", "--json"],
+      "expect": {"ok": false, "error": {"code": "platform-not-found"}}
+    }
+  ]
+}
