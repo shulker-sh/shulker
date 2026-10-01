@@ -91,7 +91,7 @@ func (s *Store) ensureMirror(ctx context.Context, what origin, source string) (s
 		return "", err
 	}
 	s.log("cloning %s", source)
-	if _, err := s.git(ctx, "clone", "--quiet", "--mirror", source, dir); err != nil {
+	if _, err := s.git(ctx, "clone", "--quiet", "--mirror", "--", source, dir); err != nil {
 		os.RemoveAll(dir)
 		if isGitAuthError(err.Error()) {
 			return "", out.Errorf(what.code, "Couldn't clone %s: it's private or doesn't exist", source)
@@ -140,7 +140,7 @@ func isGitNetworkError(msg string) bool {
 }
 
 func (s *Store) revParse(ctx context.Context, mirror, ref string) (string, error) {
-	data, err := s.git(ctx, "--git-dir="+mirror, "rev-parse", "--verify", "--quiet", refOrHead(ref)+"^{commit}")
+	data, err := s.git(ctx, "--git-dir="+mirror, "rev-parse", "--verify", "--quiet", "--end-of-options", refOrHead(ref)+"^{commit}")
 	if err != nil {
 		return "", err
 	}
