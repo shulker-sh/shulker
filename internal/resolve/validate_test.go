@@ -402,6 +402,31 @@ func TestValidateQuiltKeepsTopLevelJar(t *testing.T) {
 	}
 }
 
+func TestValidateWarnsThatQuiltsOverridesArentApplied(t *testing.T) {
+	r := lockJars(t, "quilt", map[string][]byte{
+		"slabs": fabricJar(t, `{"id":"slabs","version":"1.0.0"}`, nil),
+	})
+	r.Dir = t.TempDir()
+	v, err := r.Validate()
+	if err != nil || len(v.Warnings) != 0 {
+		t.Fatalf("no overrides file, no warning: %v %v", v, err)
+	}
+	path := filepath.Join(r.Dir, "client-overrides", "config", "quilt-loader-overrides.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(`{"schema_version":1,"overrides":[]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if v, err = r.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"the client build places config/quilt-loader-overrides.json, which shulker doesn't apply: a dependency it overrides may still be reported."}
+	if !reflect.DeepEqual(v.Warnings, want) {
+		t.Fatalf("warnings %q, want %q", v.Warnings, want)
+	}
+}
+
 func TestValidateAppliesFabricDependencyOverrides(t *testing.T) {
 	r := lockJars(t, "fabric", map[string][]byte{
 		"bwg":     fabricJar(t, `{"id":"bwg","version":"1.6.6","depends":{"terrablender":">=3.0.1.7"}}`, nil),

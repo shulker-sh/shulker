@@ -18,8 +18,9 @@ var quilt = Loader{
 	AlsoRuns:        []string{"fabric"},
 	ServerLaunchJar: "quilt-server-launch.jar",
 	MetadataFiles:   []string{"quilt.mod.json", "fabric.mod.json"}, MarkerFile: "fabric.mod.json",
-	TopLevelMandatory: true,
-	versions:          quiltVersions, profile: quiltProfile, providesJar: quiltLoaderJarURL,
+	TopLevelMandatory:  true,
+	UnappliedOverrides: "config/quilt-loader-overrides.json",
+	versions:           quiltVersions, profile: quiltProfile, providesJar: quiltLoaderJarURL,
 	ensureServer: quiltEnsureServer,
 }
 

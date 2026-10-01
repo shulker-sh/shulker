@@ -119,6 +119,9 @@ type Loader struct {
 	TopLevelMandatory bool
 	// DependencyOverrides is the file in the game dir the loader reads dependency overrides from.
 	DependencyOverrides string
+	// UnappliedOverrides is a dependency overrides file the loader reads in a format shulker
+	// doesn't apply, so a build that places one is warned about.
+	UnappliedOverrides string
 	// MavenPath is where the loader publishes its own jars, under both a Maven repository root and a
 	// server dir's libraries/.
 	MavenPath string

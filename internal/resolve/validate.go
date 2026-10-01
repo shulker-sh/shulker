@@ -128,6 +128,11 @@ func (r *Resolver) Validate(sides ...string) (*Validation, error) {
 	if err != nil {
 		return nil, err
 	}
+	unapplied, err := r.unappliedOverrides(l, checked)
+	if err != nil {
+		return nil, err
+	}
+	v.Warnings = append(v.Warnings, unapplied...)
 	sc := sideCheck{infos: infos, unread: unread, builtin: builtin, compatible: l.CompatibleVersions, topLevelOnly: l.TopLevelMandatory, byName: map[string]string{}}
 	for _, id := range r.lockIDs() {
 		sc.byName[id] = id
@@ -374,6 +379,26 @@ func (r *Resolver) dependencyOverrides(l loader.Loader, sides []string) (sideOve
 		}
 	}
 	return so, nil
+}
+
+// unappliedOverrides warns for each side whose build places an overrides file the loader reads and
+// shulker doesn't, since a problem found there may be one the file takes away.
+func (r *Resolver) unappliedOverrides(l loader.Loader, sides []string) ([]string, error) {
+	if l.UnappliedOverrides == "" {
+		return nil, nil
+	}
+	b := &build.Builder{Dir: r.Dir, Manifest: r.Manifest, Lock: r.Lock, Cache: r.Cache, Packs: r.Packs}
+	var warnings []string
+	for _, side := range sides {
+		_, ok, err := b.OverrideFile(side, l.UnappliedOverrides)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			warnings = append(warnings, fmt.Sprintf("the %s build places %s, which shulker doesn't apply: a dependency it overrides may still be reported.", side, l.UnappliedOverrides))
+		}
+	}
+	return warnings, nil
 }
 
 // candidate is one copy of a mod id the loader could load: a locked jar, a jar nested in one at
