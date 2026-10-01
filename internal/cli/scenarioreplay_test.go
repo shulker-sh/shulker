@@ -208,9 +208,13 @@ func newReplay(rec *recording) (*replay, error) {
 	}
 	rw := newRewriter(all)
 	r.rw = rw
+	// Mojang names a download by its sha1 and Modrinth looks a file up by its hash, both in the URL.
+	for _, f := range rec.Files {
+		r.files[rw.hashes.Replace(f.URL)] = r.files[f.URL]
+	}
 	for _, ex := range rec.Exchanges {
 		ex.Body = rw.rewrite(ex.Body)
-		key, err := requestKey(ex.Method, ex.URL, rw.rewrite(ex.RequestBody))
+		key, err := requestKey(ex.Method, rw.hashes.Replace(ex.URL), rw.rewrite(ex.RequestBody))
 		if err != nil {
 			return nil, err
 		}
@@ -480,5 +484,27 @@ func TestLookupListsMatchInAnyOrder(t *testing.T) {
 	sent, _ = requestKey("POST", "https://api.modrinth.com/v2/version_files", `{"hashes":["aa","bb"],"algorithm":"sha1"}`)
 	if recorded != sent {
 		t.Fatalf("%q != %q", recorded, sent)
+	}
+}
+
+func TestReplaySwapsHashesInURLs(t *testing.T) {
+	jar := recordedJar{Files: map[string]string{"fabric.mod.json": `{"id":"x"}`}}
+	real := fileHashes{Sha1: strings.Repeat("a", 40), Sha512: strings.Repeat("a", 128), Size: 9}
+	rec := &recording{
+		Files:     []recordedFile{{URL: "https://piston-data.mojang.com/v1/objects/" + real.Sha1 + "/server.jar", fileHashes: real, Jar: jar}},
+		Exchanges: []exchange{{Method: "GET", URL: "https://api.modrinth.com/v2/version_file/" + real.Sha1, Status: 200, Body: "{}"}},
+	}
+	r, err := newReplay(rec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, _ := jar.build()
+	rebuiltSha1 := hashesOf(data).Sha1
+	if _, ok := r.files["https://piston-data.mojang.com/v1/objects/"+rebuiltSha1+"/server.jar"]; !ok {
+		t.Fatal("the file is not served at the URL its rebuilt hash names")
+	}
+	key, _ := requestKey("GET", "https://api.modrinth.com/v2/version_file/"+rebuiltSha1, "")
+	if _, ok := r.responses[key]; !ok {
+		t.Fatal("a lookup by the rebuilt hash is not in the replay")
 	}
 }
