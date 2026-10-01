@@ -1192,7 +1192,7 @@ Move the instances root with `shulker config set instances <path>`; `shulker con
 
 `--with` and `--without` are saved in the instance's own `shulker.local.json`. Change them later with `shulker feature on|off --into <instance folder>`, or run `link` again with new flags.
 
-`--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java` and `--wrapper` seed the instance's own `settings` block in `.shulker/instance.json`, the same way the other `link` commands do.
+`--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java`, `--wrapper` and `--sandbox` seed the instance's own `settings` block in `.shulker/instance.json`, the same way the other `link` commands do.
 
 ```sh
 shulker link shulker
@@ -1213,6 +1213,7 @@ shulker link shulker https://example.com/pack/shulker.json --as smp
 | `--with-marker` | Include the marker mod in this instance's builds, over a manifest that leaves it out |
 | `--java <path>` | Absolute path to the Java this machine launches the instance with (default: shulker's managed runtime) |
 | `--wrapper <cmd>` | Command prefix for the launch command, such as `gamemoderun`; split on whitespace |
+| `--sandbox` | Run the game sandboxed, with the rest of your home folder out of its reach; see [`shulker hook sandbox`](#shulker-hook-sandbox-java-java-arguments). Sets the instance's `sandbox` setting |
 | `--with <feature>` | Turn a feature on for this instance; repeat for more |
 | `--without <feature>` | Turn a feature off for this instance; repeat for more |
 
@@ -1228,7 +1229,7 @@ With no source, it links the project in the current directory. Pass a project di
 
 `link` never writes over a `shulker.json` that is already in the game directory: it adopts that project, clears the unlinked mark, rewrites the launcher's own files and builds it where it stands, so relinking an instance you unlinked picks it back up with everything you added on top of the pack. If the instance already follows a different modpack, or is an ATLauncher instance shulker didn't link, `link` fails rather than taking it over. Use `--name` to create a second instance, or `--force` to link over this one: `--force` repoints the modpack the instance follows and leaves everything you added on top of it where it is.
 
-`--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java` and `--wrapper` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. The marker is not seeded: `settings.marker` is written only by `--no-marker` or `--with-marker`, and while it is absent every build reads the manifest's `marker`. Change your mind later by editing the file and running `shulker instances repair`.
+`--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java`, `--wrapper` and `--sandbox` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. The marker is not seeded: `settings.marker` is written only by `--no-marker` or `--with-marker`, and while it is absent every build reads the manifest's `marker`. Change your mind later by editing the file and running `shulker instances repair`.
 
 `--wrapper` is written into the launcher's own wrapper setting, and only when you pass one: with no `--wrapper`, that setting stays yours. ATLauncher splits its wrapper on whitespace and ignores quotes, so a wrapper word with a space in it can't be written there.
 
@@ -1253,6 +1254,7 @@ shulker link atlauncher https://example.com/pack/shulker.json --name "Friends SM
 | `--with-marker` | Include the marker mod in this instance's builds, over a manifest that leaves it out |
 | `--java <path>` | Absolute path to the Java this machine launches the instance with (default: shulker's managed runtime) |
 | `--wrapper <cmd>` | Command prefix for the launch command, such as `gamemoderun`; split on whitespace |
+| `--sandbox` | Run the game sandboxed, with the rest of your home folder out of its reach; see [`shulker hook sandbox`](#shulker-hook-sandbox-java-java-arguments). Sets the instance's `sandbox` setting |
 | `--with <feature>` | Turn a feature on for this instance; repeat for more |
 | `--without <feature>` | Turn a feature off for this instance; repeat for more |
 
@@ -1270,7 +1272,7 @@ Renaming the instance in GDLauncher moves its folder. It keeps syncing before ea
 
 `link` never writes over a `shulker.json` that is already in the game directory: it adopts that project, clears the unlinked mark, rewrites the launcher's own files and builds it where it stands, so relinking an instance you unlinked picks it back up with everything you added on top of the pack. If the instance already follows a different modpack, or is a GDLauncher instance shulker didn't link, `link` fails rather than taking it over. Use `--name` to create a second instance, or `--force` to link over this one: `--force` repoints the modpack the instance follows and leaves everything you added on top of it where it is.
 
-`--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java` and `--wrapper` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. The marker is not seeded: `settings.marker` is written only by `--no-marker` or `--with-marker`, and while it is absent every build reads the manifest's `marker`. Change your mind later by editing the file and running `shulker instances repair`.
+`--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java`, `--wrapper` and `--sandbox` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. The marker is not seeded: `settings.marker` is written only by `--no-marker` or `--with-marker`, and while it is absent every build reads the manifest's `marker`. Change your mind later by editing the file and running `shulker instances repair`.
 
 `--wrapper` is written into the launcher's own wrapper setting, and only when you pass one: with no `--wrapper`, that setting stays yours.
 
@@ -1295,6 +1297,7 @@ shulker link gdlauncher https://example.com/pack/shulker.json --name "Friends SM
 | `--with-marker` | Include the marker mod in this instance's builds, over a manifest that leaves it out |
 | `--java <path>` | Absolute path to the Java this machine launches the instance with (default: shulker's managed runtime) |
 | `--wrapper <cmd>` | Command prefix for the launch command, such as `gamemoderun`; split on whitespace |
+| `--sandbox` | Run the game sandboxed, with the rest of your home folder out of its reach; see [`shulker hook sandbox`](#shulker-hook-sandbox-java-java-arguments). Sets the instance's `sandbox` setting |
 | `--with <feature>` | Turn a feature on for this instance; repeat for more |
 | `--without <feature>` | Turn a feature off for this instance; repeat for more |
 
@@ -1308,7 +1311,7 @@ With no source, it links the project in the current directory. Pass a project di
 
 `link` never writes over a `shulker.json` that is already in the game directory: it adopts that project, clears the unlinked mark, rewrites the launcher's own files and builds it where it stands, so relinking an instance you unlinked picks it back up with everything you added on top of the pack. If the profile already follows a different modpack, `link` fails rather than repointing it. Use `--name` to create a second profile, or `--force` to repoint this one: `--force` repoints the modpack the instance follows and leaves everything you added on top of it where it is.
 
-`--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java` and `--wrapper` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. The marker is not seeded: `settings.marker` is written only by `--no-marker` or `--with-marker`, and while it is absent every build reads the manifest's `marker`. Change your mind later by editing the file and running `shulker instances repair`.
+`--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java`, `--wrapper` and `--sandbox` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. The marker is not seeded: `settings.marker` is written only by `--no-marker` or `--with-marker`, and while it is absent every build reads the manifest's `marker`. Change your mind later by editing the file and running `shulker instances repair`.
 
 `--wrapper` prefixes the Java command the shim runs, since the official launcher has no wrapper setting of its own.
 
@@ -1333,6 +1336,7 @@ shulker link mojang https://example.com/pack/shulker.json --name "Friends SMP"
 | `--with-marker` | Include the marker mod in this instance's builds, over a manifest that leaves it out |
 | `--java <path>` | Absolute path to the Java this machine launches the instance with (default: shulker's managed runtime) |
 | `--wrapper <cmd>` | Command prefix for the launch command, such as `gamemoderun`; split on whitespace |
+| `--sandbox` | Run the game sandboxed, with the rest of your home folder out of its reach; see [`shulker hook sandbox`](#shulker-hook-sandbox-java-java-arguments). Sets the instance's `sandbox` setting |
 | `--with <feature>` | Turn a feature on for this instance; repeat for more |
 | `--without <feature>` | Turn a feature off for this instance; repeat for more |
 
@@ -1346,7 +1350,7 @@ With no source, it links the project in the current directory. Pass a project di
 
 `link` never writes over a `shulker.json` that is already in the game directory: it adopts that project, clears the unlinked mark, rewrites the launcher's own files and builds it where it stands, so relinking an instance you unlinked picks it back up with everything you added on top of the pack. If the instance already follows a different modpack, `link` fails rather than repointing it. Use `--name` to create a second instance, or `--force` to repoint this one: `--force` repoints the modpack the instance follows and leaves everything you added on top of it where it is. On the next sync, files the old pack put there are removed, unless you changed them in-game.
 
-`--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java` and `--wrapper` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. The marker is not seeded: `settings.marker` is written only by `--no-marker` or `--with-marker`, and while it is absent every build reads the manifest's `marker`. Change your mind later by editing the file and running `shulker instances repair`.
+`--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java`, `--wrapper` and `--sandbox` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. The marker is not seeded: `settings.marker` is written only by `--no-marker` or `--with-marker`, and while it is absent every build reads the manifest's `marker`. Change your mind later by editing the file and running `shulker instances repair`.
 
 `--wrapper` is written into the launcher's own wrapper setting, and only when you pass one: with no `--wrapper`, that setting stays yours.
 
@@ -1371,6 +1375,7 @@ shulker link prism https://example.com/pack/shulker.json --name "Friends SMP" --
 | `--with-marker` | Include the marker mod in this instance's builds, over a manifest that leaves it out |
 | `--java <path>` | Absolute path to the Java this machine launches the instance with (default: shulker's managed runtime) |
 | `--wrapper <cmd>` | Command prefix for the launch command, such as `gamemoderun`; split on whitespace |
+| `--sandbox` | Run the game sandboxed, with the rest of your home folder out of its reach; see [`shulker hook sandbox`](#shulker-hook-sandbox-java-java-arguments). Sets the instance's `sandbox` setting |
 | `--with <feature>` | Turn a feature on for this instance; repeat for more |
 | `--without <feature>` | Turn a feature off for this instance; repeat for more |
 
@@ -1378,7 +1383,7 @@ shulker link prism https://example.com/pack/shulker.json --name "Friends SMP" --
 
 Create a MultiMC instance that syncs the client build before each launch. It is [`shulker link prism`](#shulker-link-prism) for MultiMC's own `instance.cfg` dialect, with the same source argument, flags and behaviour, and one difference: MultiMC is portable and has no fixed data folder, so `--launcher-dir` names the folder that holds `multimc.cfg`. A terminal asks `Where is MultiMC installed?` when it is missing; under `--no-input` it is required (`launcher-dir-required` without it). The instance is registered under the launcher name `multimc`, which is what `--launcher multimc` and `shulker unlink multimc` match.
 
-`--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java` and `--wrapper` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. The marker is not seeded: `settings.marker` is written only by `--no-marker` or `--with-marker`, and while it is absent every build reads the manifest's `marker`. Change your mind later by editing the file and running `shulker instances repair`.
+`--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java`, `--wrapper` and `--sandbox` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. The marker is not seeded: `settings.marker` is written only by `--no-marker` or `--with-marker`, and while it is absent every build reads the manifest's `marker`. Change your mind later by editing the file and running `shulker instances repair`.
 
 `--wrapper` is written into the launcher's own wrapper setting, and only when you pass one: with no `--wrapper`, that setting stays yours.
 
@@ -1402,6 +1407,7 @@ shulker link multimc https://github.com/shulker-sh/base-pack.git --launcher-dir 
 | `--with-marker` | Include the marker mod in this instance's builds, over a manifest that leaves it out |
 | `--java <path>` | Absolute path to the Java this machine launches the instance with (default: shulker's managed runtime) |
 | `--wrapper <cmd>` | Command prefix for the launch command, such as `gamemoderun`; split on whitespace |
+| `--sandbox` | Run the game sandboxed, with the rest of your home folder out of its reach; see [`shulker hook sandbox`](#shulker-hook-sandbox-java-java-arguments). Sets the instance's `sandbox` setting |
 | `--with <feature>` | Turn a feature on for this instance; repeat for more |
 | `--without <feature>` | Turn a feature off for this instance; repeat for more |
 

@@ -28,7 +28,7 @@ func TestLinkSettingsFlagsOnEveryLauncher(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		h.mustRun(t, "link", name, "--launcher-dir", dir, "--no-hooks", "--no-marker", "--wrapper", "gamemoderun")
+		h.mustRun(t, "link", name, "--launcher-dir", dir, "--no-hooks", "--no-marker", "--wrapper", "gamemoderun", "--sandbox")
 		gameDir := gameDirOfInstance(t, h, name)
 		f := readIntent(t, gameDir)
 		if f.Settings.PreLaunch() || f.Settings.PostExit() || f.Settings.Marker == nil || *f.Settings.Marker {
@@ -36,6 +36,9 @@ func TestLinkSettingsFlagsOnEveryLauncher(t *testing.T) {
 		}
 		if !slices.Equal(f.Settings.Wrapper, []string{"gamemoderun"}) {
 			t.Fatalf("%s: wrapper %q", name, f.Settings.Wrapper)
+		}
+		if !f.Settings.Sandboxed(false) {
+			t.Fatalf("%s: --sandbox turns the instance's sandbox on: %+v", name, f.Settings)
 		}
 	}
 }

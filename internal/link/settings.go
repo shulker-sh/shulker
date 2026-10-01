@@ -17,6 +17,8 @@ type Settings struct {
 	Marker      *bool
 	Java        string
 	Wrapper     []string
+	// Sandbox turns the instance's sandbox on; false leaves the setting as it is.
+	Sandbox bool
 }
 
 // save writes what a directory syncs from, and the settings this link decided.
@@ -44,6 +46,9 @@ func (s Settings) save(dir, source string, at modpack.At, m *manifest.Manifest) 
 	}
 	if len(s.Wrapper) > 0 {
 		f.Settings.Wrapper = s.Wrapper
+	}
+	if s.Sandbox {
+		f.Settings.Sandbox = instance.On()
 	}
 	return f.Save(dir)
 }

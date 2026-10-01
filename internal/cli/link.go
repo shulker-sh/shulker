@@ -282,6 +282,7 @@ type linkSettings struct {
 	withMarker  bool
 	java        string
 	wrapper     string
+	sandbox     bool
 }
 
 func (ls *linkSettings) register(cmd *cobra.Command) {
@@ -292,6 +293,7 @@ func (ls *linkSettings) register(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&ls.withMarker, "with-marker", false, "include the marker mod in this instance's builds, over a manifest that leaves it out.")
 	cmd.Flags().StringVar(&ls.java, "java", "", "absolute path to the Java this machine launches the instance with (default: shulker's managed runtime)")
 	cmd.Flags().StringVar(&ls.wrapper, "wrapper", "", "command prefix for the launch command, such as gamemoderun; split on whitespace")
+	cmd.Flags().BoolVar(&ls.sandbox, "sandbox", false, "run the game sandboxed, with the rest of your home folder out of its reach.")
 }
 
 func (ls linkSettings) check() error {
@@ -307,7 +309,7 @@ func (ls linkSettings) check() error {
 // isSet reports whether this link asks for any setting at all, which is what a mode with no instance
 // file to record them in has to refuse.
 func (ls linkSettings) isSet() bool {
-	return ls.noHooks || ls.noPreLaunch || ls.noPostExit || ls.noMarker || ls.withMarker || ls.java != "" || ls.wrapper != ""
+	return ls.noHooks || ls.noPreLaunch || ls.noPostExit || ls.noMarker || ls.withMarker || ls.java != "" || ls.wrapper != "" || ls.sandbox
 }
 
 // settings is the flags as the link module seeds them. The marker is left to the manifest unless a
@@ -318,6 +320,7 @@ func (ls linkSettings) settings() link.Settings {
 		NoPostExit:  ls.noHooks || ls.noPostExit,
 		Java:        ls.java,
 		Wrapper:     strings.Fields(ls.wrapper),
+		Sandbox:     ls.sandbox,
 	}
 	if ls.noMarker {
 		s.Marker = instance.Off()
