@@ -142,7 +142,7 @@ func recordScenario(t *testing.T, dir, outDir, key string, fresh bool) {
 	replayScenario(t, dir, out)
 }
 
-// withinBudget fails a recording over the 1 MB a scenario may take, naming its largest responses.
+// withinBudget fails a recording over the 1.5 MB a scenario may take, naming its largest responses.
 func withinBudget(path string, rec *recording) error {
 	info, err := os.Stat(path)
 	if err != nil {
@@ -286,7 +286,7 @@ func readScenarioFile(t *testing.T, path string, v any) {
 	}
 }
 
-// TestScenarioBudget holds the recordings to the size the repo carries: 1 MB a scenario and 8 MB
+// TestScenarioBudget holds the recordings to the size the repo carries: 1.5 MB a scenario and 8 MB
 // for the set.
 func TestScenarioBudget(t *testing.T) {
 	const total = 8 << 20

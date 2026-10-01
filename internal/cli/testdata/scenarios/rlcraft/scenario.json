@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "run": ["import", "rlcraft", "--provider", "curseforge", "--json"],
+      "expect": {"ok": false, "error": {"code": "missing-files", "message": "2 files need a manual download"}}
+    },
+    {
+      "download": [
+        "https://mediafilez.forgecdn.net/files/4436/467/SRParasites-1.12.2v1.9.11.jar",
+        "https://mediafilez.forgecdn.net/files/2782/568/RTG-1.12.2-6.1.0.0-snapshot.1.jar"
+      ]
+    },
+    {
+      "run": ["import", "rlcraft", "--provider", "curseforge", "--json"],
+      "expect": {"ok": true, "data": {"version": "2.9.3", "minecraft": "1.12.2", "loader": {"type": "forge"}, "mods": {"locked": [{"id": "rtg"}, {"id": "srparasites"}]}}}
+    },
+    {
+      "run": ["import", "rlcraft", "--json"],
+      "expect": {"ok": true, "data": {"version": "2.9.3", "merged": true}},
+      "reject": {"data": {"version": "2.9.2d"}}
+    }
+  ]
+}
