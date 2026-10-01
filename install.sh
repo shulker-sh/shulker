@@ -153,10 +153,11 @@ fi
 ok "Checksum matches"
 
 # 4. Build provenance. The release workflow publishes a signed attestation for each
-# archive; gh checks the signature and that it names this archive and the shulker-sh owner.
+# archive; gh checks the signature, that it names this archive, and that the shulker-sh/shulker
+# release workflow made it.
 verify_attestation() {
   curl -fsL -o shulker.attestation.jsonl "$base/shulker.attestation.jsonl" || return 1
-  gh attestation verify "$archive" --bundle shulker.attestation.jsonl --owner shulker-sh >/dev/null 2>&1
+  gh attestation verify "$archive" --bundle shulker.attestation.jsonl --repo shulker-sh/shulker --signer-workflow shulker-sh/shulker/.github/workflows/release.yml >/dev/null 2>&1
 }
 
 if [ -n "$WITHOUT_ATTESTATION" ]; then

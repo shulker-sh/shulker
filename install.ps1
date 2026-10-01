@@ -164,7 +164,8 @@
             Write-Ok 'Checksum matches'
 
             # 4. Build provenance. The release workflow publishes a signed attestation for each
-            # archive; gh checks the signature and that it names this archive and the shulker-sh owner.
+            # archive; gh checks the signature, that it names this archive, and that the shulker-sh/shulker
+            # release workflow made it.
             $gh = Get-Command gh -ErrorAction SilentlyContinue
 
             if ($env:SHULKER_WITHOUT_ATTESTATION) {
@@ -176,7 +177,7 @@
                 try {
                     $bundle = Join-Path $tmp 'shulker.attestation.jsonl'
                     Invoke-WebRequest -UseBasicParsing -Uri "$base/shulker.attestation.jsonl" -OutFile $bundle
-                    & $gh.Source attestation verify $archivePath --bundle $bundle --owner shulker-sh *> $null
+                    & $gh.Source attestation verify $archivePath --bundle $bundle --repo shulker-sh/shulker --signer-workflow shulker-sh/shulker/.github/workflows/release.yml *> $null
                     $verified = ($LASTEXITCODE -eq 0)
                 } catch {
                     $verified = $false
