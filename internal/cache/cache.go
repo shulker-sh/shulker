@@ -110,6 +110,27 @@ func (c *Cache) IsManual(sha string) bool {
 	return err == nil
 }
 
+// MarkFrom records that the cached object sha is what address gave: a download's url, or the name
+// of a file shulker generated. An object can come from several.
+func (c *Cache) MarkFrom(sha, address string) error {
+	marker := c.fromMarker(sha, address)
+	if err := os.MkdirAll(filepath.Dir(marker), 0o755); err != nil {
+		return err
+	}
+	return fsutil.Write(marker, nil)
+}
+
+// HasFrom reports whether the object sha is cached and came from address. A lock's author picks
+// both a file's address and its hash, and objects are kept by hash alone, so Has can't tell a file
+// its address served from one another entry brought.
+func (c *Cache) HasFrom(sha, address string) bool {
+	if !c.Has(sha) {
+		return false
+	}
+	_, err := os.Stat(c.fromMarker(sha, address))
+	return err == nil
+}
+
 // BySha1 is the sha512 of the cached object whose sha1 is sum1: how a file whose provider
 // publishes only a sha1 is found without downloading it again.
 func (c *Cache) BySha1(sum1 string) (string, bool) {
@@ -124,8 +145,8 @@ func (c *Cache) BySha1(sum1 string) (string, bool) {
 	return sha, c.Has(sha)
 }
 
-// dropIndexEntries removes each manual marker and sha1 entry whose object is gone. A marker is
-// named for its object and a sha1 entry holds it.
+// dropIndexEntries removes each manual marker, from marker and sha1 entry whose object is gone. A
+// manual marker is named for its object, a from marker's folder is, and a sha1 entry holds it.
 func (c *Cache) dropIndexEntries() error {
 	markers, err := entriesAt(filepath.Join(c.Dir, "index", "manual"), 1)
 	if err != nil {
@@ -139,6 +160,16 @@ func (c *Cache) dropIndexEntries() error {
 		if err := c.dropUnless(marker, filepath.Base(marker)); err != nil {
 			return err
 		}
+	}
+	from, err := entriesAt(filepath.Join(c.Dir, "index", "from"), 2)
+	if err != nil {
+		return err
+	}
+	for _, marker := range from {
+		if err := c.dropUnless(marker, filepath.Base(filepath.Dir(marker))); err != nil {
+			return err
+		}
+		os.Remove(filepath.Dir(marker))
 	}
 	for _, entry := range entries {
 		b, err := os.ReadFile(entry)
@@ -169,6 +200,19 @@ func (c *Cache) Ensure(ctx context.Context, client *fetch.Client, url, sha strin
 	if c.Has(sha) {
 		return c.Object(sha), nil
 	}
+	return c.download(ctx, client, url, sha)
+}
+
+// EnsureFrom is Ensure for a file that has to be what url serves: an object cached from anywhere
+// else is downloaded again.
+func (c *Cache) EnsureFrom(ctx context.Context, client *fetch.Client, url, sha string) (string, error) {
+	if c.HasFrom(sha, url) {
+		return c.Object(sha), nil
+	}
+	return c.download(ctx, client, url, sha)
+}
+
+func (c *Cache) download(ctx context.Context, client *fetch.Client, url, sha string) (string, error) {
 	_, err := c.fetch(ctx, client, url, func(got, _ string) error {
 		if got == sha {
 			return nil
@@ -205,7 +249,10 @@ func (c *Cache) fetch(ctx context.Context, client *fetch.Client, url string, che
 			return "", err
 		}
 	}
-	return sha, c.commit(tmp.Name(), sha, sum1, false)
+	if err := c.commit(tmp.Name(), sha, sum1, false); err != nil {
+		return "", err
+	}
+	return sha, c.MarkFrom(sha, url)
 }
 
 // ClonesInto reports whether CopyTo places objects in dir as clones, by trying one.

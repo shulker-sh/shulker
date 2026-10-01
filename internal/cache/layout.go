@@ -24,6 +24,7 @@ import (
 //	index/listings.json            the listing index: proven pairs of two providers' listings of one item
 //	index/sha1/<aa>/<sha1>         the sha512 of the object with this sha1
 //	index/manual/<sha512>          marks an object downloaded by hand, which no provider serves
+//	index/from/<sha512>/<sha256>   marks an object as what the address with this sha256 gave
 //
 // Paths are built here and nowhere else.
 
@@ -51,6 +52,11 @@ func (c *Cache) Object(sha string) string {
 
 func (c *Cache) manualMarker(sha string) string {
 	return filepath.Join(c.Dir, "index", "manual", sha)
+}
+
+func (c *Cache) fromMarker(sha, address string) string {
+	sum := sha256.Sum256([]byte(address))
+	return filepath.Join(c.Dir, "index", "from", sha, hex.EncodeToString(sum[:]))
 }
 
 func (c *Cache) sha1Entry(sum1 string) string {

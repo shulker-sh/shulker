@@ -261,3 +261,59 @@ func TestClonesIntoIsFalseWithCloningOff(t *testing.T) {
 		t.Fatalf("the probe left files in the cache: %v", entries)
 	}
 }
+
+func TestAnObjectIsFromOnlyTheAddressesThatGaveIt(t *testing.T) {
+	hits := 0
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		w.Write([]byte("an installer"))
+	}))
+	defer srv.Close()
+	c, ctx, client := newCache(t), context.Background(), fetch.New("test")
+	sha, err := c.Put(strings.NewReader("an installer"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.HasFrom(sha, srv.URL+"/installer.jar") {
+		t.Fatal("an object put by hand is from no address")
+	}
+
+	if _, err := c.Ensure(ctx, client, srv.URL+"/installer.jar", sha); err != nil || hits != 0 {
+		t.Fatalf("Ensure takes a cached object from anywhere: %v, %d downloads", err, hits)
+	}
+	if _, err := c.EnsureFrom(ctx, client, srv.URL+"/installer.jar", sha); err != nil || hits != 1 {
+		t.Fatalf("EnsureFrom downloads an object another address gave: %v, %d downloads", err, hits)
+	}
+	if _, err := c.EnsureFrom(ctx, client, srv.URL+"/installer.jar", sha); err != nil || hits != 1 {
+		t.Fatalf("EnsureFrom takes an object its address gave: %v, %d downloads", err, hits)
+	}
+	if !c.HasFrom(sha, srv.URL+"/installer.jar") || c.HasFrom(sha, srv.URL+"/another.jar") {
+		t.Fatal("the object is from the address it was downloaded from and no other")
+	}
+
+	other, err := c.Put(strings.NewReader("another jar"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.EnsureFrom(ctx, client, srv.URL+"/installer.jar", other); err == nil || c.HasFrom(other, srv.URL+"/installer.jar") {
+		t.Fatalf("a download that hashes differently marks nothing: %v", err)
+	}
+}
+
+func TestPruneDropsTheFromMarkersOfAnObjectItRemoves(t *testing.T) {
+	c := newCache(t)
+	sha, err := c.Put(strings.NewReader("nothing references me"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.MarkFrom(sha, "https://example.com/a.jar"); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := c.Prune(nil, PruneOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if exists(filepath.Dir(c.fromMarker(sha, "https://example.com/a.jar"))) {
+		t.Fatal("the pruned object's from markers are still there")
+	}
+}
