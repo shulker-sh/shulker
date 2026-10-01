@@ -35,7 +35,8 @@ var prismEntry = &Entry{
 		Force: "repoint the modpack an instance already follows.",
 	},
 	Accounts: prismAccounts, WindowsAppData: "PrismLauncher",
-	relink: relinkLauncher, forget: forgetInstance, name: prismName, gameDirs: prismGameDirs,
+	Process: &Process{Names: []string{"prismlauncher"}},
+	relink:  relinkLauncher, forget: forgetInstance, name: prismName, gameDirs: prismGameDirs,
 	readSlots: readPrismSlots, writeSlots: writePrismSlots, slotFile: instanceFileIn(PrismInstanceFile),
 	place: placePrism, link: linkPrism, after: restartIfUpdated,
 	detect: detectPrism,
@@ -154,7 +155,7 @@ func restartIfUpdated(e *Entry, res InstanceResult) string {
 	if res.Created {
 		return ""
 	}
-	return "restart " + e.Title + " if it is open so the change is picked up"
+	return restartNote(e, "so the change is picked up")
 }
 
 func (p *Prism) InstancesDir() string { return p.settingDir("InstanceDir", "instances") }

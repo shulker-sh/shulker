@@ -103,7 +103,11 @@ type Entry struct {
 	// detect says whether the launcher owns a game directory, going by the layout around it, and
 	// names the launcher directory when the layout gives that away too.
 	detect func(gameDir string) (launcherDir string, ok bool)
-	// running says whether the launcher is open, for a launcher that can tell.
+	// Process is the launcher's own process, which says whether it is open. Nil means none
+	// shulker knows.
+	Process *Process
+	// running says whether the launcher is open by a lock it holds, for a launcher that keeps one.
+	// It is asked first, and the processes only where it can't tell.
 	running func() (running, detectable bool)
 	place   func(e *Entry, req *Link) (Placement, error)
 	link    func(ctx context.Context, e *Entry, req *Link, p Placement) (InstanceResult, error)
@@ -271,10 +275,15 @@ func (e *Entry) HasDir() bool { return e.Usage.Dir != "" }
 
 // IsRunning says whether the launcher is open, and whether this machine can tell at all.
 func (e *Entry) IsRunning() (running, detectable bool) {
-	if e.running == nil {
+	if e.running != nil {
+		if running, detectable := e.running(); detectable {
+			return running, true
+		}
+	}
+	if e.Process == nil {
 		return false, false
 	}
-	return e.running()
+	return e.Process.running()
 }
 
 // Relink is the command that recreates an entry, and the directory to run it in

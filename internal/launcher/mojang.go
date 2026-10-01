@@ -52,6 +52,8 @@ var mojangEntry = &Entry{
 	readSlots: readMojangSlots, writeSlots: writeMojangSlots, slotFile: mojangSlotFile,
 	place: placeMojang, link: linkMojang,
 	detect: detectMojang,
+	// The macOS app's executable is plain "launcher", so it is known by the bundle around it.
+	Process: &Process{Names: []string{"minecraft-launcher", "minecraftlauncher", "minecraft"}, PathSuffix: "/Minecraft.app/Contents/MacOS/launcher"},
 }
 
 // detectMojang knows a game directory by where placeMojang puts one, and by the profile shulker

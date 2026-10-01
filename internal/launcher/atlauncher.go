@@ -47,8 +47,12 @@ var atlauncherEntry = &Entry{
 	place: placeATLauncher, link: linkATLauncher,
 	Accounts: atlauncherAccounts, WindowsAppData: "ATLauncher",
 	detect: detectATLauncher,
+	// ATLauncher is a jar, so its process is Java's: the macOS app and the Windows exe both hand
+	// over to it and name the main class, the exe exiting once it has, and a Linux package runs
+	// the jar.
+	Process: &Process{JavaCommand: []string{"com.atlauncher.App", "ATLauncher.jar"}},
 	after: func(e *Entry, _ InstanceResult) string {
-		return "restart " + e.Title + " if it is open so the instance shows up"
+		return restartNote(e, "so the instance shows up")
 	},
 }
 

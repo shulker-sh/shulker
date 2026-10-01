@@ -40,6 +40,7 @@ var multimcEntry = &Entry{
 	place: placeMultiMC, link: linkMultiMC, after: restartIfUpdated,
 	Accounts: prismAccounts,
 	detect:   detectMultiMC,
+	Process:  &Process{Names: []string{"multimc"}},
 }
 
 type MultiMC struct {

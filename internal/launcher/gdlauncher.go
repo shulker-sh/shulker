@@ -61,7 +61,8 @@ var gdlauncherEntry = &Entry{
 	locate: filepath.EvalSymlinks, running: GDLauncherRunning,
 	place: placeGDLauncher, link: linkGDLauncher, after: gdlauncherAfter,
 	Accounts: gdlauncherAccounts, WindowsAppData: filepath.Join("gdlauncher_carbon", "data"),
-	detect: detectGDLauncher,
+	detect:  detectGDLauncher,
+	Process: &Process{Names: []string{"gdlauncher"}},
 }
 
 func detectGDLauncher(gameDir string) (string, bool) {
@@ -189,12 +190,12 @@ func placeGDLauncher(_ *Entry, req *Link) (Placement, error) {
 // linkGDLauncher writes the instance GDLauncher installs from, asking for a loader version it can
 // install. GDLauncher is warned about rather than waited for: it reads its instances when it starts
 // and writes its own copy back over them while open.
-func linkGDLauncher(ctx context.Context, _ *Entry, req *Link, _ Placement) (InstanceResult, error) {
+func linkGDLauncher(ctx context.Context, e *Entry, req *Link, _ Placement) (InstanceResult, error) {
 	loaderVersion, err := gdlauncherLoaderVersion(ctx, req)
 	if err != nil {
 		return InstanceResult{}, err
 	}
-	if running, _ := GDLauncherRunning(); running {
+	if running, _ := e.IsRunning(); running {
 		req.WarnNudge(out.Nudge{Lead: "Quit it, then link again", Command: "shulker link gdlauncher"}, "GDLauncher is open and may overwrite this instance.")
 	}
 	g := &GDLauncher{Dir: req.LauncherDir}
@@ -208,7 +209,7 @@ func linkGDLauncher(ctx context.Context, _ *Entry, req *Link, _ Placement) (Inst
 
 // gdlauncherAfter keeps the restart reminder for where an open GDLauncher can't be detected.
 func gdlauncherAfter(e *Entry, _ InstanceResult) string {
-	if _, detectable := GDLauncherRunning(); detectable {
+	if _, detectable := e.IsRunning(); detectable {
 		return ""
 	}
 	return "restart " + e.Title + " if it is open so the instance shows up"

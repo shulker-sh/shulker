@@ -34,6 +34,10 @@ All notable changes to shulker are documented here. The format is based on
 
 - `sync` at a terminal lists the mods it adds, the files no provider published and the entries now locked from another project, and asks before applying them. `--no-input`, `play`, `link` and the launcher hooks apply them and warn. The pack's entry in the in-game mod list shows a month of these changes by day, plus notices for files gone from their provider and jars changed since they were placed.
 
+- `link`, `unlink` and `instances repair` tell whether Prism Launcher, MultiMC, ATLauncher and the Minecraft Launcher are open, as they could for GDLauncher on macOS and Linux, and GDLauncher on Windows too. An open launcher gets a plain "restart it", a closed one no reminder at all, and "restart it if it's open" is left for where shulker can't tell.
+
+- A game directory `link mojang` made is recognised as the Minecraft Launcher's when its registry row records no launcher.
+
 - A linked instance shows the pack's `icon` in Prism Launcher, MultiMC and the Minecraft Launcher too, as it already did in ATLauncher and GDLauncher, and shulker's own icon when the pack names none. A sync replaces the picture only when the pack's icon changes, so one you picked in the launcher stays. A Prism or MultiMC instance linked earlier takes it after one more `shulker link`.
 
 ### Changed
