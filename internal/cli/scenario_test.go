@@ -316,7 +316,7 @@ func TestScenarioBudget(t *testing.T) {
 func TestReplayServesRebuiltJars(t *testing.T) {
 	dir := filepath.Join(scenariosDir, "fabric-add")
 	h := replayScenario(t, dir, filepath.Join(dir, "responses.json.gz"))
-	jar := h.replay.files["https://cdn.modrinth.com/data/AANobbMI/versions/u1OEbNKx/sodium-fabric-0.6.0%2Bmc1.21.1.jar"]
+	jar := h.replay.files[sodiumURL(t, h.replay)]
 	var l struct {
 		Mods map[string]struct {
 			Sha512 string `json:"sha512"`
@@ -345,19 +345,32 @@ func TestReplayMissNamesMethodAndPath(t *testing.T) {
 
 func TestDownloadStepPlacesTheRebuiltFile(t *testing.T) {
 	h := newReplayHarness(t, filepath.Join(scenariosDir, "fabric-add", "responses.json.gz"))
-	url := "https://cdn.modrinth.com/data/AANobbMI/versions/u1OEbNKx/sodium-fabric-0.6.0%2Bmc1.21.1.jar"
-	if err := h.runStep(t, scenarioStep{Download: []string{url}}); err != nil {
+	u := sodiumURL(t, h.replay)
+	if err := h.runStep(t, scenarioStep{Download: []string{u}}); err != nil {
 		t.Fatal(err)
 	}
-	data, err := os.ReadFile(filepath.Join(h.dir, resolve.DownloadsDir, "sodium-fabric-0.6.0+mc1.21.1.jar"))
+	name, _ := url.PathUnescape(path.Base(u))
+	data, err := os.ReadFile(filepath.Join(h.dir, resolve.DownloadsDir, name))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(data, h.replay.files[url].data) {
+	if !bytes.Equal(data, h.replay.files[u].data) {
 		t.Fatal("the placed file is not the rebuilt jar")
 	}
 	err = h.runStep(t, scenarioStep{Download: []string{"https://cdn.modrinth.com/data/missing.jar"}})
 	if err == nil || !strings.Contains(err.Error(), "GET cdn.modrinth.com/data/missing.jar") {
 		t.Fatalf("got %v", err)
 	}
+}
+
+// sodiumURL is where fabric-add's recording downloads Sodium from.
+func sodiumURL(t *testing.T, r *replay) string {
+	t.Helper()
+	for _, f := range r.rec.Files {
+		if strings.Contains(f.URL, "/sodium-fabric-") {
+			return f.URL
+		}
+	}
+	t.Fatal("fabric-add downloads no Sodium jar")
+	return ""
 }
