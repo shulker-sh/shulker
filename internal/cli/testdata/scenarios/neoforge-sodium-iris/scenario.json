@@ -1,0 +1,17 @@
+{
+  "steps": [
+    {
+      "run": ["create", "--neoforge", "--minecraft", "1.21.1", "--json"],
+      "expect": {"ok": true}
+    },
+    {
+      "run": ["add", "sodium", "iris", "--json"],
+      "expect": {"ok": true, "data": {"added": [{"id": "sodium"}, {"id": "iris"}]}}
+    },
+    {
+      "run": ["check", "--json"],
+      "expect": {"ok": true},
+      "reject": {"data": {"problems": [{}]}}
+    }
+  ]
+}
