@@ -110,6 +110,9 @@ type Slots struct {
 	// Commands is read only: the launcher's own switch for running an instance's commands, nil
 	// where it has none or the instance leaves it unset. Writing a command turns it on.
 	Commands *bool
+	// ClearWrapper empties the wrapper slot, which an empty Wrapper alone never does. It is for
+	// the one wrapper shulker writes unasked, the sandbox, once the sandbox is off.
+	ClearWrapper bool
 	// MemoryMB, JVMArgs and Width with Height are the instance's own launch settings, write only
 	// and, like the wrapper, only ever filled: one the instance leaves unset stays the launcher's.
 	// JVMArgs is one string, split by the launcher the way it splits a wrapper.
@@ -127,18 +130,71 @@ func WrapperCommand(launcherName string, words []string) string {
 }
 
 func wrapperCommand(launcherName string, words []string, goos string) string {
+	return joinWrapper(slotOf(launcherName), words, goos)
+}
+
+// joinWrapper is words as one wrapper command, quoted the way the slot's launcher splits it.
+func joinWrapper(slot Slot, words []string, goos string) string {
 	quoted := make([]string, 0, len(words))
 	for _, word := range words {
-		quoted = append(quoted, wrapperWord(launcherName, word, goos))
+		if strings.ContainsAny(word, " \t\"'\\") {
+			word = slot.quote(word, goos)
+		}
+		quoted = append(quoted, word)
 	}
 	return strings.Join(quoted, " ")
 }
 
-func wrapperWord(launcherName, word, goos string) string {
-	if !strings.ContainsAny(word, " \t\"'\\") {
-		return word
+// splitWrapper is a wrapper command a launcher's slot held, as the words that launcher would run:
+// split on spaces alone where the launcher ignores quotes, and otherwise with single and double
+// quotes holding a word together and a backslash keeping the quote or backslash after it.
+func splitWrapper(slot Slot, command string) []string {
+	if slot.quote("a b", runtime.GOOS) == "a b" {
+		return strings.Fields(command)
 	}
-	return slotOf(launcherName).quote(word, goos)
+	var words []string
+	var word strings.Builder
+	var quote rune
+	inWord := false
+	runes := []rune(command)
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
+		switch {
+		case r == '\\' && i+1 < len(runes) && strings.ContainsRune(`"'\`, runes[i+1]):
+			i++
+			word.WriteRune(runes[i])
+			inWord = true
+		case quote != 0 && r == quote:
+			quote = 0
+		case quote == 0 && (r == '"' || r == '\''):
+			quote, inWord = r, true
+		case quote == 0 && (r == ' ' || r == '\t'):
+			if inWord {
+				words = append(words, word.String())
+				word.Reset()
+				inWord = false
+			}
+		default:
+			word.WriteRune(r)
+			inWord = true
+		}
+	}
+	if inWord {
+		words = append(words, word.String())
+	}
+	return words
+}
+
+// SandboxWords are the words that sandbox the command following them, for a wrapper slot or a
+// launch shulker starts itself.
+func SandboxWords(shulker string) []string {
+	return []string{shulker, "hook", "sandbox", "--"}
+}
+
+// IsSandboxWrapper reports whether a wrapper slot's command runs the game through shulker's
+// sandbox.
+func IsSandboxWrapper(command string) bool {
+	return strings.Contains(command, " hook sandbox --")
 }
 
 // ReadSlots is what a launcher currently has in an instance's slots, and whether the instance exists
@@ -246,6 +302,8 @@ func writePrismSlots(e *Entry, in config.Instance, s Slots) error {
 	}
 	if s.Wrapper != "" {
 		set["WrapperCommand"] = s.Wrapper
+	} else if s.ClearWrapper {
+		remove["WrapperCommand"] = true
 	}
 	// Prism reads all three from the instance only with this on (BaseInstance.cpp registers them
 	// against it), so a wrapper needs it as much as a command does.
@@ -323,6 +381,8 @@ func writeMultiMCSlots(e *Entry, in config.Instance, s Slots) error {
 	}
 	if s.Wrapper != "" {
 		set["WrapperCommand"] = s.Wrapper
+	} else if s.ClearWrapper {
+		remove["WrapperCommand"] = true
 	}
 	// MultiMC reads all three from the instance only with this on, so a wrapper needs it as much as
 	// a command does.
@@ -371,6 +431,8 @@ func writeATLauncherSlots(e *Entry, in config.Instance, s Slots) error {
 	}
 	if s.Wrapper != "" {
 		settings["wrapperCommand"] = jsonString(s.Wrapper)
+	} else if s.ClearWrapper {
+		delete(settings, "wrapperCommand")
 	}
 	if s.MemoryMB > 0 {
 		settings["maximumMemory"] = json.RawMessage(strconv.Itoa(s.MemoryMB))
@@ -407,6 +469,8 @@ func writeGDLauncherSlots(e *Entry, in config.Instance, s Slots) error {
 	}
 	if s.Wrapper != "" {
 		top["wrapper_command"] = jsonString(s.Wrapper)
+	} else if s.ClearWrapper {
+		delete(top, "wrapper_command")
 	}
 	path := filepath.Join(instanceDir, GDLauncherInstanceFile)
 	if s.MemoryMB > 0 || s.JVMArgs != "" || s.Width > 0 && s.Height > 0 {
@@ -460,10 +524,19 @@ func ReleaseSlots(e *Entry, in config.Instance) (tookPreLaunch, tookPostExit boo
 			}
 		}
 	} else if found {
-		if err := WriteSlots(e, in, Slots{
+		release := Slots{
 			PreLaunch: releaseSlot(adopted.PreLaunch, current.PreLaunch),
 			PostExit:  releaseSlot(adopted.PostExit, current.PostExit),
-		}); err != nil {
+		}
+		// A sandbox left in the wrapper slot would keep the game from starting once shulker is gone,
+		// so the slot goes back to the player's own wrapper, or to nothing.
+		if IsSandboxWrapper(current.Wrapper) {
+			if ferr == nil {
+				release.Wrapper = joinWrapper(*e.Slot, f.Settings.Wrapper, runtime.GOOS)
+			}
+			release.ClearWrapper = release.Wrapper == ""
+		}
+		if err := WriteSlots(e, in, release); err != nil {
 			return false, false, err
 		}
 	}

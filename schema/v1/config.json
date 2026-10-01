@@ -136,6 +136,11 @@
           "minimum": 0,
           "default": 7,
           "description": "How many days old a provider version must be before shulker chooses it for add, update, lock or a floating modpack. 0 turns the check off."
+        },
+        "sandbox": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether an instance that doesn't set `sandbox` itself runs its game sandboxed, with the rest of your home folder out of the game's reach. macOS only so far; elsewhere the game starts without it and shulker says so."
         }
       }
     },

@@ -109,6 +109,10 @@
           "items": { "type": "string", "minLength": 1 },
           "description": "Command prefix for the launch command, such as [\"gamemoderun\"]. For another launcher's instance, omitted leaves that launcher's own wrapper setting alone; for one shulker launches, omitted inherits `play.wrapper` from config.json."
         },
+        "sandbox": {
+          "type": "boolean",
+          "description": "Whether the game runs sandboxed, in every launcher: it can read and write this instance and its save group, and read the Java, libraries and assets it starts from, and nothing else under your home folder or on another volume. `mods/` and `.shulker/` are read-only to it. The network stays open. Omitted inherits `security.sandbox` from config.json. macOS only so far. On, shulker owns the launcher's wrapper setting: a wrapper typed into the launcher moves into `wrapper` here and still runs, outside the sandbox. The game's own \"Open Folder\" buttons do nothing while it is on."
+        },
         "account": {
           "type": "string",
           "minLength": 1,

@@ -62,6 +62,8 @@ type Settings struct {
 	Commands *Commands `json:"commands,omitempty"`
 	Marker   *bool     `json:"marker,omitempty"`
 	LaunchSettings
+	// Sandbox is whether the game runs sandboxed; nil inherits security.sandbox from config.json.
+	Sandbox       *bool  `json:"sandbox,omitempty"`
 	Account       string `json:"account,omitempty"`
 	Shulker       string `json:"shulker,omitempty"`
 	LaunchHistory *int   `json:"launchHistory,omitempty"`
@@ -76,6 +78,14 @@ type LaunchSettings struct {
 	Java    string   `json:"java,omitempty"`
 	Window  string   `json:"window,omitempty"`
 	Wrapper []string `json:"wrapper,omitempty"`
+}
+
+// Sandboxed is whether the instance's game runs sandboxed, given the default it inherits.
+func (s Settings) Sandboxed(inherited bool) bool {
+	if s.Sandbox == nil {
+		return inherited
+	}
+	return *s.Sandbox
 }
 
 // MemoryMB is the memory setting in megabytes, 0 when it is unset or isn't a size.

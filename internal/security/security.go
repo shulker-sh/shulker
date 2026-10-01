@@ -32,6 +32,7 @@ const (
 	Takedowns        ID = "takedowns"
 	PlacedJars       ID = "placed-jars"
 	SyncReview       ID = "sync-review"
+	Sandbox          ID = "sandbox"
 )
 
 // Refusal marks e as protection id refusing something: it names the protection for --json and ends
@@ -79,12 +80,19 @@ func Days(d time.Duration) int { return int(d / (24 * time.Hour)) }
 
 // Protections lists every protection, in the order `shulker security` shows them, with the release
 // age as security.minReleaseAge sets it.
-func Protections(releaseAge time.Duration) []Protection {
+func Protections(releaseAge time.Duration, sandbox bool) []Protection {
 	value := "off"
 	if days := Days(releaseAge); days > 0 {
 		value = out.Count(days, "day", "days")
 	}
 	return append(slices.Clone(protections), Protection{
+		ID:      Sandbox,
+		Summary: "A sandboxed game can read and write its own instance and saves and nothing else under your home folder, so a malicious mod can't read your keys, browser profiles and launcher accounts, or install itself to start with your computer.",
+		On:      sandbox,
+		Setting: "security.sandbox",
+		Value:   onOff(sandbox),
+		Changes: "Whether an instance that doesn't set sandbox itself runs its game sandboxed; macOS only so far",
+	}, Protection{
 		ID:      ReleaseAge,
 		Summary: "A version published more recently than the release age is held back when shulker chooses one, so a hijacked mod's new release has time to be caught and taken down before it reaches you.",
 		On:      releaseAge > 0,
@@ -92,6 +100,13 @@ func Protections(releaseAge time.Duration) []Protection {
 		Value:   value,
 		Changes: "How many days old a version must be before add, update, lock or a floating modpack takes it; 0 turns it off",
 	})
+}
+
+func onOff(on bool) string {
+	if on {
+		return "on"
+	}
+	return "off"
 }
 
 // Refused is err's error when a protection refused something.

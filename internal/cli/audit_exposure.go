@@ -44,7 +44,7 @@ func (a *app) auditExposureCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			x, err := audit.Expose(scope.builder, audit.ExposureOptions{Instances: instances, Play: cfg.Play.LaunchSettings, PackMemory: scope.project.ClientMemory(), Protections: security.Protections(cfg.Security.ReleaseAge())})
+			x, err := audit.Expose(scope.builder, audit.ExposureOptions{Instances: instances, Play: cfg.Play.LaunchSettings, PackMemory: scope.project.ClientMemory(), Protections: security.Protections(cfg.Security.ReleaseAge(), cfg.Security.Sandbox)})
 			if err != nil {
 				return err
 			}

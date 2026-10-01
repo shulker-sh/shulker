@@ -329,7 +329,7 @@ func TestReconcileSaysWhenItTurnsATLauncherCommandsBackOn(t *testing.T) {
 			if tc.off {
 				f.Settings.Hooks.PreLaunch, f.Settings.Hooks.PostExit = instance.Off(), instance.Off()
 			}
-			r, err := Reconcile(Find("atlauncher"), slotRow("atlauncher", dir), f, "/bin/shulker")
+			r, err := Reconcile(Find("atlauncher"), slotRow("atlauncher", dir), f, "/bin/shulker", false)
 			if err != nil || r.CommandsOn != tc.want {
 				t.Fatalf("CommandsOn = %v, %v; want %v", r.CommandsOn, err, tc.want)
 			}

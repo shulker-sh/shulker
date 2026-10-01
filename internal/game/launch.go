@@ -107,14 +107,25 @@ type Launch struct {
 	Log  string   `json:"log"`
 	// Wrapper is a command the launch runs through, handed java and its argv as its own arguments.
 	Wrapper []string `json:"wrapper,omitempty"`
+	// Sandbox is the command that sandboxes what follows it, put between the wrapper and java so
+	// the player's own wrapper stays outside the sandbox.
+	Sandbox []string `json:"sandbox,omitempty"`
 }
 
-// Program is what a launch execs: its wrapper when it has one, else java.
+// Program is what a launch execs: its wrapper when it has one, else the sandbox, else java.
 func (l Launch) Program() string {
-	if len(l.Wrapper) > 0 {
-		return l.Wrapper[0]
-	}
-	return l.Java
+	return l.command(l.Wrapper)[0]
+}
+
+// Starter is what the launch execs once its wrapper is out of the way: the sandbox when it has
+// one, else java. It is the program to name when the game never started.
+func (l Launch) Starter() string {
+	return l.command(nil)[0]
+}
+
+// command is the launch as one command line behind a wrapper, which may be none.
+func (l Launch) command(wrapper []string) []string {
+	return slices.Concat(wrapper, l.Sandbox, []string{l.Java}, l.Argv)
 }
 
 // Game is a game that has started: the process to record, and the wait that ends when it exits.
@@ -137,10 +148,8 @@ func Start(l Launch, stream io.Writer) (*Game, error) {
 	if err != nil {
 		return nil, err
 	}
-	cmd := exec.Command(l.Java, l.Argv...)
-	if len(l.Wrapper) > 0 {
-		cmd = exec.Command(l.Wrapper[0], slices.Concat(l.Wrapper[1:], []string{l.Java}, l.Argv)...)
-	}
+	words := l.command(l.Wrapper)
+	cmd := exec.Command(words[0], words[1:]...)
 	cmd.Dir = l.Dir
 	cmd.Stdout = io.Writer(log)
 	if stream != nil {

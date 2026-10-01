@@ -26,7 +26,13 @@ func (a *app) securityCmd() *cobra.Command {
 			if err != nil {
 				a.printer.Warn("couldn't read security.minReleaseAge, showing its default: %v.", err)
 			}
-			info := securityInfo{Stance: security.Stance, Protections: security.Protections(age)}
+			sandboxed := false
+			if path, err := a.configFile(); err == nil {
+				if cfg, err := config.LoadFile(path); err == nil {
+					sandboxed = cfg.Security.Sandbox
+				}
+			}
+			info := securityInfo{Stance: security.Stance, Protections: security.Protections(age, sandboxed)}
 			return a.printer.Emit(info, func(l *out.Lines) { printSecurity(l, info) })
 		},
 	}

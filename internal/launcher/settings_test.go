@@ -28,7 +28,7 @@ func TestReconcileWritesTheInstancesLaunchSettingsIntoPrismAndMultiMC(t *testing
 			if name == "multimc" {
 				unescape = multimcUnescape
 			}
-			if _, err := Reconcile(e, slotRow(name, dir), instance.New(), "/bin/shulker"); err != nil {
+			if _, err := Reconcile(e, slotRow(name, dir), instance.New(), "/bin/shulker", false); err != nil {
 				t.Fatal(err)
 			}
 			values, err := readINI(cfg, unescape)
@@ -39,7 +39,7 @@ func TestReconcileWritesTheInstancesLaunchSettingsIntoPrismAndMultiMC(t *testing
 				t.Fatalf("an instance that sets nothing leaves the launcher's settings alone: %+v", values)
 			}
 
-			r, err := Reconcile(e, slotRow(name, dir), settingsFile(), "/bin/shulker")
+			r, err := Reconcile(e, slotRow(name, dir), settingsFile(), "/bin/shulker", false)
 			if err != nil || len(r.Unapplied) != 0 {
 				t.Fatalf("reconcile: %+v %v", r, err)
 			}
@@ -66,7 +66,7 @@ func TestReconcileWritesMemoryAndArgumentsIntoATLauncherButNoWindow(t *testing.T
 	write(t, path, `{"launcher":{"name":"Cozy","maximumMemory":2048}}`)
 	f := settingsFile()
 	f.Settings.JVMArgs = []string{"-XX:+UseZGC", "-Dx=1"}
-	r, err := Reconcile(Find("atlauncher"), slotRow("atlauncher", dir), f, "/bin/shulker")
+	r, err := Reconcile(Find("atlauncher"), slotRow("atlauncher", dir), f, "/bin/shulker", false)
 	if err != nil || !slices.Equal(r.Unapplied, []string{"window"}) {
 		t.Fatalf("ATLauncher has no window size of an instance's own: %+v %v", r, err)
 	}
@@ -90,7 +90,7 @@ func TestReconcileWritesLaunchSettingsIntoGDLaunchersGameConfiguration(t *testin
 	dir := t.TempDir()
 	path := filepath.Join(dir, GDLauncherInstanceFile)
 	write(t, path, `{"name":"Cozy","game_configuration":{"version":{"release":"26.2"},"global_java_args":true}}`)
-	if _, err := Reconcile(Find("gdlauncher"), slotRow("gdlauncher", dir), instance.New(), "/bin/shulker"); err != nil {
+	if _, err := Reconcile(Find("gdlauncher"), slotRow("gdlauncher", dir), instance.New(), "/bin/shulker", false); err != nil {
 		t.Fatal(err)
 	}
 	var got struct {
@@ -118,7 +118,7 @@ func TestReconcileWritesLaunchSettingsIntoGDLaunchersGameConfiguration(t *testin
 	if read(); got.Game.Memory != nil || got.Game.ExtraJavaArgs != "" || got.Game.GameResolution != "" {
 		t.Fatalf("an instance that sets nothing leaves the launcher's settings alone: %+v", got.Game)
 	}
-	if _, err := Reconcile(Find("gdlauncher"), slotRow("gdlauncher", dir), settingsFile(), "/bin/shulker"); err != nil {
+	if _, err := Reconcile(Find("gdlauncher"), slotRow("gdlauncher", dir), settingsFile(), "/bin/shulker", false); err != nil {
 		t.Fatal(err)
 	}
 	read()

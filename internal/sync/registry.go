@@ -7,6 +7,7 @@ import (
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
+	"shulker.sh/shulker/internal/sandbox"
 )
 
 // InstanceID is the id `-i` takes for a directory, for the message that names it. Empty when the
@@ -35,14 +36,26 @@ func Reconcile(e *Env, in config.Instance) (rehooked bool) {
 	if err == nil {
 		var exe string
 		if exe, err = launcher.ShulkerPath(); err == nil {
-			r, err = launcher.Reconcile(entry, in, f, exe)
+			sandboxed := f.Settings.Sandboxed(e.Sandbox)
+			if sandboxed && !sandbox.Supported() {
+				e.Warn("the sandbox isn't available on this system, so %s starts without it.", in.ID)
+				sandboxed = false
+			}
+			r, err = launcher.Reconcile(entry, in, f, exe, sandboxed)
 		}
 	}
 	for _, command := range r.Adopted {
 		e.warnUnreproducible(*entry.Slot, command)
 	}
 	for _, key := range r.Unapplied {
+		if key == "sandbox" {
+			e.Warn("%s can't run a wrapper whose path holds a space, so %s starts without the sandbox; move shulker to a path without one.", entry.Title, in.ID)
+			continue
+		}
 		e.Warn("%s keeps one %s setting for every instance, so the %s set for %s isn't applied.", entry.Title, key, key, in.ID)
+	}
+	if r.AdoptedWrapper != "" {
+		e.Warn("the sandbox now owns %s's wrapper for %s, so its wrapper %q moved into the instance's settings.wrapper and still runs, outside the sandbox.", entry.Title, in.ID, r.AdoptedWrapper)
 	}
 	if r.CommandsOn {
 		e.Warn("turned commands back on in %s for %s, since shulker's hooks run as its commands.", entry.Title, in.ID)

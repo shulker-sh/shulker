@@ -33,7 +33,7 @@ const (
 )
 
 // Keys are the config.json keys `shulker config` reads and sets.
-var Keys = []string{"accounts.default", "accounts.stores", "cache.clone", "curseforge.key", "downloads.watch", "eula", "instances", "log.keepDays", "play.java", "play.jvmArgs", "play.memory", "play.saveBackups", "play.window", "play.wrapper", "registry", "saves", "security.minReleaseAge", "store"}
+var Keys = []string{"accounts.default", "accounts.stores", "cache.clone", "curseforge.key", "downloads.watch", "eula", "instances", "log.keepDays", "play.java", "play.jvmArgs", "play.memory", "play.saveBackups", "play.window", "play.wrapper", "registry", "saves", "security.minReleaseAge", "security.sandbox", "store"}
 
 // Secrets are the keys whose values `shulker config` masks unless asked to reveal them.
 var Secrets = []string{"curseforge.key"}
@@ -122,6 +122,8 @@ func (l Log) Days() int {
 type Security struct {
 	// MinReleaseAge is how many days old a provider version must be before shulker chooses it.
 	MinReleaseAge *int `json:"minReleaseAge,omitempty"`
+	// Sandbox is whether an instance that doesn't say runs its game sandboxed.
+	Sandbox bool `json:"sandbox,omitempty"`
 }
 
 const DefaultMinReleaseAge = 7

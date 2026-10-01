@@ -26,3 +26,16 @@ func TestWithLaunchSettingsPutsJVMOptionsBeforeTheMainClass(t *testing.T) {
 		t.Fatalf("an argv with no main class comes back as it was: %q", got)
 	}
 }
+
+func TestALaunchRunsBehindItsWrapperThenItsSandbox(t *testing.T) {
+	l := Launch{Java: "/java", Argv: []string{"-cp", "a.jar", "Main"}, Wrapper: []string{"gamemoderun"}, Sandbox: []string{"/shulker", "hook", "sandbox", "--"}}
+	if want := []string{"gamemoderun", "/shulker", "hook", "sandbox", "--", "/java", "-cp", "a.jar", "Main"}; !slices.Equal(l.command(l.Wrapper), want) {
+		t.Fatalf("got %q", l.command(l.Wrapper))
+	}
+	if want := []string{"/shulker", "hook", "sandbox", "--", "/java", "-cp", "a.jar", "Main"}; !slices.Equal(l.command(nil), want) {
+		t.Fatalf("a wrapper that can't run gives way, the sandbox never does: %q", l.command(nil))
+	}
+	if l.Program() != "gamemoderun" || (Launch{Java: "/java"}).Program() != "/java" || (Launch{Java: "/java", Sandbox: l.Sandbox}).Program() != "/shulker" {
+		t.Fatal("Program is the first word of the command")
+	}
+}

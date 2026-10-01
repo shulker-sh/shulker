@@ -188,7 +188,7 @@ func TestWrapFallsBackToJavaWhenTheWrapperCantRun(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("a wrapper that can't run must not fail the launch: code=%d\nstdout: %s\nstderr: %s", code, stdout, stderr)
 	}
-	if !strings.Contains(stderr, `Can't run the wrapper "shulker-no-such-wrapper", so the game starts with Java alone`) {
+	if !strings.Contains(stderr, `Can't run the wrapper "shulker-no-such-wrapper", so the game starts without it`) {
 		t.Fatalf("the fallback should warn:\n%s", stderr)
 	}
 	if got := readArgs(t, argsFile); got != "--gameDir\n"+gameDir+"\n--accessToken\n"+accessToken+"\n" {

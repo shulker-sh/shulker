@@ -6,13 +6,17 @@ package sync
 
 import (
 	"context"
+	"os"
 
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/env"
+	"shulker.sh/shulker/internal/instance"
+	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/resolve"
+	"shulker.sh/shulker/internal/sandbox"
 	"shulker.sh/shulker/internal/saves"
 )
 
@@ -26,6 +30,8 @@ type Env struct {
 	Saves    saves.Roots
 	// SaveBackups is how many automatic backups a save group keeps, play.saveBackups.
 	SaveBackups int
+	// Sandbox is security.sandbox: whether an instance that doesn't say runs its game sandboxed.
+	Sandbox bool
 	// AskUnlock is asked whether to unlock a modpack built for another Minecraft than the
 	// project's; nil keeps the refusal.
 	AskUnlock func(key, minecraft string) (bool, error)
@@ -81,4 +87,25 @@ func (e *Env) updateInstances(update func([]config.Instance) []config.Instance) 
 		return false
 	}
 	return changed
+}
+
+// Registered is the registry row for a directory, when there is one.
+func (e *Env) Registered(dir string) (config.Instance, bool) { return e.registered(dir) }
+
+// SandboxWords are the words a launch shulker starts itself puts before Java to sandbox the game,
+// nil when the instance, by its own setting or security.sandbox, runs without one. A system with
+// no sandbox is said so rather than left to look protected.
+func (e *Env) SandboxWords(id string, s instance.Settings) []string {
+	if !s.Sandboxed(e.Sandbox) {
+		return nil
+	}
+	if !sandbox.Supported() {
+		e.Warn("the sandbox isn't available on this system, so %s starts without it.", id)
+		return nil
+	}
+	exe, err := launcher.ShulkerPath()
+	if err != nil {
+		exe = os.Args[0]
+	}
+	return launcher.SandboxWords(exe)
 }

@@ -13,7 +13,9 @@ import (
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/game"
 	"shulker.sh/shulker/internal/instance"
+	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/sandbox"
 	"shulker.sh/shulker/internal/security"
 	"shulker.sh/shulker/internal/sync"
 )
@@ -32,7 +34,7 @@ func (a *app) hookCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.AddCommand(a.hookPreLaunchCmd(), a.hookPostExitCmd(), a.hookWrapCmd())
+	cmd.AddCommand(a.hookPreLaunchCmd(), a.hookPostExitCmd(), a.hookWrapCmd(), a.hookSandboxCmd())
 	return cmd
 }
 
@@ -75,6 +77,65 @@ func (a *app) hookPreLaunchCmd() *cobra.Command {
 	a.instanceFlag(cmd)
 	cmd.Flags().DurationVar(&deadline, "deadline", 0, "stop the update after this long and explain why (default: no deadline).")
 	return cmd
+}
+
+// hookSandboxCmd stands between a launcher's wrapper slot and Java: it works out from the java
+// arguments what the game needs, and replaces itself with Java under the system's sandbox with the
+// rest of the player's home out of reach. It finds the instance from --gameDir and takes no -C,
+// since a launcher that splits its wrapper on spaces couldn't carry one. Like hook wrap it is
+// handed the session token, which goes to Java and nowhere else.
+func (a *app) hookSandboxCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:         "sandbox -- <java> <java arguments>",
+		Annotations: acts(),
+		Short:       "Run the game with the rest of your home folder out of its reach",
+		Args:        cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			java, argv := args[0], args[1:]
+			policy, err := sandbox.Derive(java, argv, a.sandboxOptions(argv))
+			if errors.Is(err, sandbox.ErrNoGameDir) {
+				// A launcher checking the Java version starts no game, so there is nothing to confine.
+				code, _, err := game.Run(game.Launch{Java: java, Argv: argv}, a.stdin, a.gameStdout(), a.printer.Stderr)
+				if err != nil {
+					return notStarted(fmt.Sprintf("can't run Java at %s: %v", java, err))
+				}
+				if code != 0 {
+					return &out.Error{Code: "game-exit", Message: fmt.Sprintf("java exited with status %d", code), Exit: code}
+				}
+				return nil
+			}
+			if err != nil {
+				return notStarted(fmt.Sprintf("can't sandbox the game, so it didn't start: %v", err))
+			}
+			return notStarted(fmt.Sprintf("can't sandbox the game, so it didn't start: %v", sandbox.Exec(policy, java, argv)))
+		},
+	}
+}
+
+// sandboxOptions is what the sandbox needs beyond the java arguments: where save groups live, so a
+// saves link is followed only there, and the launcher's own file for the instance, which the game
+// must not rewrite when the launcher keeps it in the game directory.
+func (a *app) sandboxOptions(argv []string) sandbox.Options {
+	var o sandbox.Options
+	if r, err := a.roots(); err == nil {
+		o.SavesRoot = r.saves().Saves
+	}
+	gameDir, ok := game.GameDirOf(argv)
+	if !ok {
+		return o
+	}
+	se, err := a.syncEnv()
+	if err != nil {
+		return o
+	}
+	if in, ok := se.Registered(gameDir); ok {
+		if e := launcher.Find(in.Launcher); e != nil {
+			if file := launcher.SlotFile(e, in); file != "" {
+				o.ProtectFiles = append(o.ProtectFiles, file)
+			}
+		}
+	}
+	return o
 }
 
 func (a *app) hookPostExitCmd() *cobra.Command {
@@ -150,17 +211,29 @@ func (a *app) hookWrapCmd() *cobra.Command {
 			if launching {
 				argv = game.WithLaunchSettings(argv, f.Settings.Memory, f.Settings.JVMArgs, f.Settings.Window)
 			}
-			code, gaveWay, err := game.Run(game.Launch{Java: java, Argv: argv, Wrapper: f.Settings.Wrapper}, a.stdin, a.gameStdout(), a.printer.Stderr)
+			l := game.Launch{Java: java, Argv: argv, Wrapper: f.Settings.Wrapper}
+			if launching {
+				if se, err := a.syncEnv(); err == nil {
+					l.Sandbox = se.SandboxWords(a.instanceID(dir), f.Settings)
+				} else if f.Settings.Sandboxed(false) {
+					return notStarted(fmt.Sprintf("can't set up the sandbox %s asks for: %v", a.instanceID(dir), err))
+				}
+			}
+			code, gaveWay, err := game.Run(l, a.stdin, a.gameStdout(), a.printer.Stderr)
 			if gaveWay != nil {
-				a.printer.Warn("can't run the wrapper %q, so the game starts with Java alone: %v.", f.Settings.Wrapper[0], gaveWay)
+				a.printer.Warn("can't run the wrapper %q, so the game starts without it: %v.", f.Settings.Wrapper[0], gaveWay)
 			}
 			if err != nil {
 				if launching {
-					if err := instance.FailLaunch(dir, f.Settings.LaunchKeep(), stamped, runReason(java, err)); err != nil {
+					if err := instance.FailLaunch(dir, f.Settings.LaunchKeep(), stamped, runReason(l.Starter(), err)); err != nil {
 						a.printer.Warn("%v", err)
 					}
 				}
-				return notStarted(fmt.Sprintf("can't run Java at %s, so the game didn't start: %v", java, err))
+				what := "Java at " + java
+				if len(l.Sandbox) > 0 {
+					what = "the sandbox command " + l.Starter()
+				}
+				return notStarted(fmt.Sprintf("can't run %s, so the game didn't start: %v", what, err))
 			}
 			if launching && f.Settings.PostExit() {
 				if _, err := instance.CloseRun(dir, f.Settings.LaunchKeep(), 0, instance.NoExitCode); err != nil {

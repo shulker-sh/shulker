@@ -38,7 +38,9 @@ type Plan struct {
 	Java       string
 	Platform   game.Platform
 	Settings   instance.Settings
-	Target     game.QuickPlay
+	// Sandbox is the command the game runs behind when the instance is sandboxed, nil otherwise.
+	Sandbox []string
+	Target  game.QuickPlay
 	// Sync is the sync that ran first, nil when none did.
 	Sync *sync.Result
 }
@@ -89,6 +91,7 @@ func Assemble(ctx context.Context, e *Env, in config.Instance, req Request) (*Pl
 	if plan.Settings, err = settings(e, f, p); err != nil {
 		return nil, err
 	}
+	plan.Sandbox = e.SandboxWords(plan.Instance.ID, plan.Settings)
 	if plan.Java, err = clientJava(ctx, e, p, plan.Settings); err != nil {
 		return nil, err
 	}
@@ -169,6 +172,7 @@ func (p *Plan) Launch(e *Env, session account.Account, window string, now time.T
 		Dir:     p.Instance.Dir,
 		Log:     log,
 		Wrapper: p.Settings.Wrapper,
+		Sandbox: p.Sandbox,
 	}, nil
 }
 

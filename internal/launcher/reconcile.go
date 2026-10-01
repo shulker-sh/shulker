@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"slices"
+	"strings"
 
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/instance"
@@ -17,7 +20,7 @@ import (
 // through the same path that first set it. A launcher with no slot fills none and gets no scripts.
 // A foreign command the launcher's slots held moves into f's own settings, so the generated script
 // keeps running it instead of destroying it.
-func Reconcile(e *Entry, in config.Instance, f *instance.File, exe string) (Reconciled, error) {
+func Reconcile(e *Entry, in config.Instance, f *instance.File, exe string, sandbox bool) (Reconciled, error) {
 	var r Reconciled
 	if !e.HasHooks() {
 		return r, nil
@@ -81,6 +84,25 @@ func Reconcile(e *Entry, in config.Instance, f *instance.File, exe string) (Reco
 	} else {
 		// The shim prepends the wrapper itself; every other launcher has a slot of its own for it.
 		want.Wrapper = WrapperCommand(in.Launcher, f.Settings.Wrapper)
+		switch {
+		case sandbox:
+			// With the sandbox on shulker owns the slot, so a wrapper the player typed into the
+			// launcher moves into the instance's own settings once, and keeps running outside it.
+			if len(f.Settings.Wrapper) == 0 && current.Wrapper != "" && !IsSandboxWrapper(current.Wrapper) {
+				f.Settings.Wrapper = splitWrapper(slot, current.Wrapper)
+				r.AdoptedWrapper = current.Wrapper
+			}
+			words := slices.Concat(f.Settings.Wrapper, SandboxWords(exe))
+			// A launcher that splits its wrapper on spaces alone can't carry a path holding one.
+			quotes := slot.quote("a b", runtime.GOOS) != "a b"
+			if !quotes && slices.ContainsFunc(words, func(word string) bool { return strings.ContainsAny(word, " \t") }) {
+				r.Unapplied = append(r.Unapplied, "sandbox")
+			} else {
+				want.Wrapper = WrapperCommand(in.Launcher, words)
+			}
+		case want.Wrapper == "" && IsSandboxWrapper(current.Wrapper):
+			want.ClearWrapper = true
+		}
 		want.MemoryMB = f.Settings.MemoryMB()
 		want.JVMArgs = WrapperCommand(in.Launcher, f.Settings.JVMArgs)
 		if width, height, ok := f.Settings.WindowSize(); ok {
@@ -114,6 +136,9 @@ type Reconciled struct {
 	CommandsOn bool
 	// Unapplied are the launch settings the instance sets that the launcher has no place for.
 	Unapplied []string
+	// AdoptedWrapper is the wrapper the launcher's slot held when the sandbox took the slot over,
+	// now in the instance's own settings.
+	AdoptedWrapper string
 }
 
 // noSlots is the error for a launcher file that is gone or no longer holds the instance.
