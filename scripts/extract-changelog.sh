@@ -29,6 +29,7 @@ url="$(printf '%s' "$link" | sed -E 's/^\[[^]]*\]:[[:space:]]*//')"
 
 printf '%s' "$notes"
 
-if [ -n "$url" ]; then
+# Unreleased has no tag to link to: it is what a pre-release ships.
+if [ -n "$url" ] && [ "$version" != "Unreleased" ]; then
   printf '\n\n**Changes in v%s:** [v%s](%s)\n' "$version" "$version" "$url"
 fi
