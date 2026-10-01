@@ -2,6 +2,8 @@ package play
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"shulker.sh/shulker/internal/account"
@@ -102,6 +104,9 @@ func Assemble(ctx context.Context, e *Env, in config.Instance, req Request) (*Pl
 	if plan.Launchable, err = e.Store.Fill(ctx, p.Lock, plan.Platform, src); err != nil {
 		return nil, sync.KeepInstallerOutput(e.Env, err)
 	}
+	if changed := plan.Launchable.Changed; len(changed) > 0 {
+		e.WarnSecurity(security.Warn(security.CacheHash, changedJars(changed), changed))
+	}
 	plan.Natives = instance.NativesDir(in.Dir)
 	if err := plan.Launchable.Assembly.ExtractNatives(e.Store, plan.Natives, plan.Platform); err != nil {
 		return nil, err
@@ -171,4 +176,14 @@ func (p *Plan) Launch(e *Env, session account.Account, window string, now time.T
 func hasBuild(dir string) bool {
 	st, err := instance.ReadState(dir)
 	return err == nil && len(st.Files) > 0
+}
+
+// changedJars says which jars a fill found changed in the game store, each a row beneath the headline.
+func changedJars(changed []string) string {
+	headline := "1 jar in the game store had changed since shulker downloaded it, and was downloaded again"
+	if len(changed) != 1 {
+		headline = fmt.Sprintf("%d jars in the game store had changed since shulker downloaded them, and were downloaded again", len(changed))
+	}
+
+	return headline + "\n" + strings.Join(changed, "\n")
 }

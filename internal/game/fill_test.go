@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -192,5 +193,33 @@ func TestFillRunsALoaderInstallerOnceWithTheClientJarInPlace(t *testing.T) {
 	h.fill(t)
 	if len(runs) != 1 || h.saved != 1 {
 		t.Fatalf("a second fill runs the installer %d times and saves the lock %d times", len(runs), h.saved)
+	}
+}
+
+func TestFillFetchesAJarChangedInTheStoreAgain(t *testing.T) {
+	p := envtest.NewPiston(t)
+	h := newFillHarness(t, p, loader.Loader{}, nil)
+	if l := h.fill(t); len(l.Changed) != 0 {
+		t.Fatalf("a first fill finds nothing changed: %v", l.Changed)
+	}
+	library := "libraries/com/mojang/brigadier/1.3.10/brigadier-1.3.10.jar"
+	path := filepath.Join(h.store.Root, filepath.FromSlash(library))
+	original, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rewritten := slices.Clone(original)
+	rewritten[0] ^= 0xff
+	if err := os.WriteFile(path, rewritten, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	l := h.fill(t)
+
+	if !slices.Equal(l.Changed, []string{library}) {
+		t.Fatalf("changed %v, want the library rewritten at the same size", l.Changed)
+	}
+	if got, err := os.ReadFile(path); err != nil || !bytes.Equal(got, original) {
+		t.Fatalf("the library is fetched again: %v", err)
 	}
 }

@@ -247,6 +247,17 @@ func (s Store) Has(f File) bool {
 	return err == nil && strings.EqualFold(sum, f.Sha1)
 }
 
+// Changed reports whether the store holds a file whose bytes aren't the ones its version JSON
+// names. Has takes a file of the right size, which anything that runs as the player can write, so
+// the jars a launch runs are asked this as well.
+func (s Store) Changed(f File) bool {
+	if f.Sha1 == "" {
+		return false
+	}
+	sum, err := fsutil.SHA1(s.Local(f))
+	return err == nil && !strings.EqualFold(sum, f.Sha1)
+}
+
 // InstalledLoader is the version id a loader wrote into the store, by its own installer or from its
 // launcher profile, remembered so a launch needs neither again. The note is the store's own
 // bookkeeping: losing it costs one install or one download and nothing else.

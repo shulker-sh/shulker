@@ -67,7 +67,7 @@ var protections = []Protection{
 	{ID: HTTPS, On: true, Summary: "Every download, API call and redirect uses https, and every git remote https or ssh, so nothing can be swapped on its way to you."},
 	{ID: MrpackHosts, On: true, Summary: "An mrpack downloads only from the hosts Modrinth allows, so a pack can't pull its files from anywhere else."},
 	{ID: Provenance, On: true, Summary: "A lock entry that names a provider has to download from that provider's own hosts, and the loader's installer and server files from where the loader and Mojang publish them, so a lock can't pass a file from anywhere else off as a mod it names or as the installer shulker runs."},
-	{ID: CacheHash, On: true, Summary: "Every file placed from the cache is checked against its hash, so a copy changed in the cache can't spread to other instances."},
+	{ID: CacheHash, On: true, Summary: "Every file placed from the cache is checked against its hash, and every jar a launch runs from the game store against the hash its version names, so a copy changed in the cache can't spread to other instances."},
 	{ID: ManifestJVMArgs, On: true, Summary: "A manifest can't add its own flags to the java command line, such as -javaagent, so a source can't run code outside its mods."},
 	{ID: PlacedJars, On: true, Summary: "A build checks every jar it placed in mods/ against the copy it locked, and warns when one has changed since rather than keeping it quietly, so a jar rewritten on your disk, as Fractureiser did, gets noticed."},
 	{ID: SyncReview, On: true, Summary: "A sync lists the mods it adds, the files no provider published and the entries now locked from another project, and asks before applying them at a terminal, so a pack's new code doesn't reach you unseen."},

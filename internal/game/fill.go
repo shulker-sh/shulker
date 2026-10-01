@@ -2,7 +2,10 @@ package game
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"path"
+	"slices"
 
 	"golang.org/x/sync/errgroup"
 	"shulker.sh/shulker/internal/fetch"
@@ -11,6 +14,7 @@ import (
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/mojang"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/security"
 )
 
 // Sources is where the store fills from: Mojang's index for the vanilla version JSON, the fetch
@@ -45,6 +49,9 @@ type Launchable struct {
 	Top      Version
 	Version  Version
 	Assembly Assembly
+	// Changed are the jars the store held with other bytes than their version JSON names, each
+	// fetched again, as paths under the store.
+	Changed []string
 }
 
 // downloadJobs is how many files the store fetches at once. An asset index names thousands of
@@ -71,10 +78,36 @@ func (s Store) Fill(ctx context.Context, lk *lock.Lock, p Platform, src Sources)
 	if err != nil {
 		return Launchable{}, err
 	}
+	changed, err := s.dropChanged(assembly)
+	if err != nil {
+		return Launchable{}, err
+	}
 	if err := s.fillAssembly(ctx, src, assembly); err != nil {
 		return Launchable{}, err
 	}
-	return Launchable{ID: id, Top: top, Version: v, Assembly: assembly}, nil
+	return Launchable{ID: id, Top: top, Version: v, Assembly: assembly, Changed: changed}, nil
+}
+
+// dropChanged removes each jar a launch runs, the client, its libraries and its natives, whose
+// bytes in the store aren't the ones the version JSON names, so the fill fetches it again. A jar a
+// loader's installer wrote has no address to come from again, and stops the launch instead.
+func (s Store) dropChanged(a Assembly) ([]string, error) {
+	var changed []string
+	for _, f := range slices.Concat([]File{a.Client}, a.Libraries, a.Natives) {
+		if !s.Changed(f) {
+			continue
+		}
+		if f.URL == "" {
+			e := out.Errorf("checksum-mismatch", "%s in the game store isn't the file its version json names", f.Path)
+			e.Help = fmt.Sprintf("delete %s and launch again, so the loader's installer writes it again", s.loadersPath())
+			return nil, security.Refusal(security.CacheHash, e)
+		}
+		if err := os.Remove(s.Local(f)); err != nil {
+			return nil, err
+		}
+		changed = append(changed, f.Path)
+	}
+	return changed, nil
 }
 
 // fillVersion puts the version JSON a launch runs, and the vanilla one it inherits from, into the
