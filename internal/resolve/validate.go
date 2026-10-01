@@ -369,7 +369,7 @@ func (r *Resolver) dependencyOverrides(l loader.Loader, sides []string) (sideOve
 			so[side] = nil
 			continue
 		}
-		if so[side], err = jarmeta.ParseDependencyOverrides(data); err != nil {
+		if so[side], err = jarmeta.ParseDependencyOverrides(l.DependencyOverrides, data); err != nil {
 			return nil, out.Errorf("dependency-overrides-invalid", "%s can't read the %s the %s build places", l.Title, l.DependencyOverrides, side).WithCause(l.DependencyOverrides, err)
 		}
 	}

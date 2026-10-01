@@ -7,7 +7,7 @@ import (
 )
 
 func TestDependencyOverrides(t *testing.T) {
-	o, err := ParseDependencyOverrides([]byte(`{"version": 1, "overrides": {
+	o, err := ParseDependencyOverrides("config/fabric_loader_dependencies.json", []byte(`{"version": 1, "overrides": {
 		"biomeswevegone": {"-depends": {"terrablender": "IGNORED"}, "+depends": {"lithium": ["<0.12", ">=0.13"]}},
 		"kleeslabs": {"breaks": {"balm-fabric": "*"}, "-breaks": {"slabbed": "*"}},
 		"other": {"-depends": {"x": "*"}}
@@ -32,6 +32,59 @@ func TestDependencyOverrides(t *testing.T) {
 	}
 }
 
+func TestFMLDependencyOverrides(t *testing.T) {
+	o, err := ParseDependencyOverrides("config/fml.toml", []byte(`
+maxThreads = -1
+
+[dependencyOverrides]
+create = ["-flywheel", "+sodium", "ponder"]
+jei = "-forge"
+later = "+create"
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	create := &Info{
+		ID:              "create",
+		Depends:         map[string]Range{"flywheel": {"[1.0,)"}, "neoforge": {"[21,)"}},
+		Optional:        map[string]Range{"flywheel": {"[1.0,)"}, "sodium": {"*"}},
+		Breaks:          map[string]Range{"flywheel": {"[0.6,1.0)"}},
+		DependencySides: map[string]string{"flywheel": "client"},
+	}
+	got := o.Apply(create)
+	if _, depends := got.Depends["flywheel"]; depends || len(got.Depends) != 1 || len(got.Breaks) != 0 || len(got.DependencySides) != 0 {
+		t.Errorf("a removal drops the dependency whatever its type: %+v", got)
+	}
+	if _, optional := got.Optional["sodium"]; !optional || len(got.Optional) != 1 {
+		t.Errorf("an ordering override changes no dependency: %v", got.Optional)
+	}
+	if len(create.Depends) != 2 || len(create.Optional) != 2 || len(create.DependencySides) != 1 {
+		t.Error("Apply changed the info it was given")
+	}
+	if later := &(Info{ID: "later"}); o.Apply(later) != later {
+		t.Error("a mod with only ordering overrides should come back as is")
+	}
+
+	for name, file := range map[string]string{
+		"no table":            "maxThreads = -1\n",
+		"not a table":         "dependencyOverrides = 3\n",
+		"an entry of no sign": "[dependencyOverrides]\ncreate = \"flywheel\"\n",
+	} {
+		if o, err := ParseDependencyOverrides("config/fml.toml", []byte(file)); err != nil || len(o) != 0 {
+			t.Errorf("%s: FML ignores it, got %v %v", name, o, err)
+		}
+	}
+	for name, file := range map[string]string{
+		"not TOML":        "[dependencyOverrides\n",
+		"a number":        "[dependencyOverrides]\ncreate = [1]\n",
+		"an empty string": "[dependencyOverrides]\ncreate = \"\"\n",
+	} {
+		if _, err := ParseDependencyOverrides("config/fml.toml", []byte(file)); err == nil {
+			t.Errorf("%s: FML throws on it", name)
+		}
+	}
+}
+
 func TestDependencyOverridesInvalid(t *testing.T) {
 	for name, data := range map[string]string{
 		"version not first": `{"overrides": {}, "version": 1}`,
@@ -41,7 +94,7 @@ func TestDependencyOverridesInvalid(t *testing.T) {
 		"number range":      `{"version": 1, "overrides": {"a": {"depends": {"b": 1}}}}`,
 		"not json":          `{"version": 1,`,
 	} {
-		if _, err := ParseDependencyOverrides([]byte(data)); err == nil {
+		if _, err := ParseDependencyOverrides("config/fabric_loader_dependencies.json", []byte(data)); err == nil {
 			t.Errorf("%s: parsed, want an error", name)
 		}
 	}

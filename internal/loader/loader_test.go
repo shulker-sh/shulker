@@ -60,6 +60,15 @@ func TestSupportsModernForgeInstallersOnly(t *testing.T) {
 	}
 }
 
+func TestNeoForgeReadsDependencyOverridesFrom1211(t *testing.T) {
+	if old, _ := For("neoforge", "1.20.6"); old.DependencyOverrides != "" {
+		t.Errorf("NeoForge 1.20.6 has no dependency overrides, got %q", old.DependencyOverrides)
+	}
+	if current, _ := For("neoforge", "1.21.1"); current.DependencyOverrides != "config/fml.toml" {
+		t.Errorf("NeoForge 1.21.1 reads dependency overrides from fml.toml, got %q", current.DependencyOverrides)
+	}
+}
+
 func TestForLeavesOtherLoadersAlone(t *testing.T) {
 	l, _ := For("neoforge", "1.12.2")
 	want, _ := Lookup("neoforge")
