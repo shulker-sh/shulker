@@ -1,0 +1,12 @@
+{
+  "steps": [
+    {
+      "run": ["create", "--fabric", "--minecraft", "26.2", "--json"],
+      "expect": {"ok": true}
+    },
+    {
+      "run": ["add", "modmenu", "--json"],
+      "expect": {"ok": true, "data": {"added": [{"id": "modmenu"}, {"id": "placeholder-api", "requiredBy": ["modmenu"]}]}}
+    }
+  ]
+}
