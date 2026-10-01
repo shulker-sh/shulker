@@ -38,13 +38,6 @@ func TestNeedsUpdate(t *testing.T) {
 	}
 }
 
-func TestParseChecksums(t *testing.T) {
-	sums := ParseChecksums("abc  shulker_0.0.1_linux_amd64.tar.gz\ndef  checksums.txt\n\n")
-	if sums["shulker_0.0.1_linux_amd64.tar.gz"] != "abc" || sums["checksums.txt"] != "def" || len(sums) != 2 {
-		t.Fatalf("got %v", sums)
-	}
-}
-
 func TestInstallFromTarGz(t *testing.T) {
 	dir := t.TempDir()
 	archive := filepath.Join(dir, "shulker_0.0.2_linux_amd64.tar.gz")

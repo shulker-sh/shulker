@@ -26,6 +26,8 @@ type selfUpdateHarness struct {
 	app            *app
 	exe            string
 	stdout, stderr bytes.Buffer
+	// mutable serves the release as one GitHub hasn't locked.
+	mutable bool
 }
 
 func newSelfUpdateHarness(t *testing.T, current, tag string, corrupt bool) *selfUpdateHarness {
@@ -42,20 +44,17 @@ func newSelfUpdateHarness(t *testing.T, current, tag string, corrupt bool) *self
 		checksum = strings.Repeat("0", len(checksum))
 	}
 	asset := selfupdate.AssetName(tag, runtime.GOOS, runtime.GOARCH)
+	h := &selfUpdateHarness{exe: filepath.Join(t.TempDir(), "shulker")}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/latest", func(w http.ResponseWriter, _ *http.Request) {
-		fmt.Fprintf(w, `{"tag_name":%q}`, tag)
+		fmt.Fprintf(w, `{"tag_name":%q,"immutable":%t,"assets":[{"name":%q,"digest":"sha256:%s"}]}`, tag, !h.mutable, asset, checksum)
 	})
 	mux.HandleFunc("/download/"+tag+"/"+asset, func(w http.ResponseWriter, _ *http.Request) {
 		w.Write(archive)
 	})
-	mux.HandleFunc("/download/"+tag+"/checksums.txt", func(w http.ResponseWriter, _ *http.Request) {
-		fmt.Fprintf(w, "%s  %s\n", checksum, asset)
-	})
 	server := httptest.NewTLSServer(mux)
 	t.Cleanup(server.Close)
 
-	h := &selfUpdateHarness{exe: filepath.Join(t.TempDir(), "shulker")}
 	if err := os.WriteFile(h.exe, []byte("old binary"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -228,6 +227,18 @@ func TestSelfUpdateChecksumMismatchKeepsBinary(t *testing.T) {
 		t.Fatal("expected a failure")
 	}
 	if h.errorCode(t) != "self-update-checksum" || h.binary(t) != "old binary" {
+		t.Fatalf("stdout %s, binary %q", &h.stdout, h.binary(t))
+	}
+}
+
+func TestSelfUpdateRefusesAReleaseThatIsntImmutable(t *testing.T) {
+	h := newSelfUpdateHarness(t, "0.0.1", "v0.0.2", false)
+	h.mutable = true
+
+	if code := h.run("--json"); code == 0 {
+		t.Fatal("expected a failure")
+	}
+	if h.errorCode(t) != "self-update-mutable" || h.binary(t) != "old binary" {
 		t.Fatalf("stdout %s, binary %q", &h.stdout, h.binary(t))
 	}
 }

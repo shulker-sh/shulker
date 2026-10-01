@@ -21,11 +21,6 @@ import (
 	"shulker.sh/shulker/internal/fetch"
 )
 
-// Owner is the GitHub account shulker releases, and their build attestations, come from.
-const Owner = "shulker-sh"
-
-const bundleName = "shulker.attestation.jsonl"
-
 // Releases reads shulker's releases on GitHub.
 type Releases struct {
 	Fetch       *fetch.Client
@@ -41,18 +36,39 @@ func New(f *fetch.Client) *Releases {
 	}
 }
 
-// Latest is the tag of the newest published release.
-func (r *Releases) Latest(ctx context.Context) (string, error) {
+// Published is a published release as GitHub's API describes it.
+type Published struct {
+	Tag string
+	// Immutable is whether GitHub has locked the release: its tag can't move and its assets can't
+	// be replaced, so the digests below are of the files it was published with.
+	Immutable bool
+	// Digests holds each asset's sha256 in hex, by file name.
+	Digests map[string]string
+}
+
+// Latest is the newest published release.
+func (r *Releases) Latest(ctx context.Context) (Published, error) {
 	var rel struct {
-		TagName string `json:"tag_name"`
+		TagName   string `json:"tag_name"`
+		Immutable bool   `json:"immutable"`
+		Assets    []struct {
+			Name   string `json:"name"`
+			Digest string `json:"digest"`
+		} `json:"assets"`
 	}
 	if err := r.Fetch.GetJSON(ctx, r.LatestURL, &rel); err != nil {
-		return "", err
+		return Published{}, err
 	}
 	if rel.TagName == "" {
-		return "", fmt.Errorf("%s: no tag_name in the response", r.LatestURL)
+		return Published{}, fmt.Errorf("%s: no tag_name in the response", r.LatestURL)
 	}
-	return rel.TagName, nil
+	release := Published{Tag: rel.TagName, Immutable: rel.Immutable, Digests: map[string]string{}}
+	for _, a := range rel.Assets {
+		if sum, ok := strings.CutPrefix(a.Digest, "sha256:"); ok {
+			release.Digests[a.Name] = sum
+		}
+	}
+	return release, nil
 }
 
 // AssetName is the release archive built for an OS and architecture.
@@ -64,17 +80,21 @@ func AssetName(tag, goos, goarch string) string {
 	return fmt.Sprintf("shulker_%s_%s_%s.%s", strings.TrimPrefix(tag, "v"), goos, goarch, ext)
 }
 
+// ErrMutable is a release GitHub hasn't locked, whose assets could have been replaced since it
+// was published.
+var ErrMutable = errors.New("the release isn't immutable")
+
 // Download saves this platform's archive for a release into dir and returns its path, once its
-// sha256 matches the release's checksums.txt.
-func (r *Releases) Download(ctx context.Context, tag, dir string) (string, error) {
-	asset := AssetName(tag, runtime.GOOS, runtime.GOARCH)
-	var sums strings.Builder
-	if _, err := r.Fetch.Download(ctx, r.url(tag, "checksums.txt"), &sums); err != nil {
-		return "", err
+// sha256 matches the digest GitHub recorded when the release was published. A release that isn't
+// immutable is refused, since its digests vouch for nothing.
+func (r *Releases) Download(ctx context.Context, rel Published, dir string) (string, error) {
+	if !rel.Immutable {
+		return "", ErrMutable
 	}
-	want, ok := ParseChecksums(sums.String())[asset]
+	asset := AssetName(rel.Tag, runtime.GOOS, runtime.GOARCH)
+	want, ok := rel.Digests[asset]
 	if !ok {
-		return "", fmt.Errorf("no checksum listed for %s", asset)
+		return "", fmt.Errorf("the release lists no digest for %s", asset)
 	}
 	path := filepath.Join(dir, asset)
 	f, err := os.Create(path)
@@ -82,7 +102,7 @@ func (r *Releases) Download(ctx context.Context, tag, dir string) (string, error
 		return "", err
 	}
 	h := sha256.New()
-	_, err = r.Fetch.Download(ctx, r.url(tag, asset), io.MultiWriter(f, h))
+	_, err = r.Fetch.Download(ctx, r.url(rel.Tag, asset), io.MultiWriter(f, h))
 	if cerr := f.Close(); err == nil {
 		err = cerr
 	}
@@ -95,14 +115,17 @@ func (r *Releases) Download(ctx context.Context, tag, dir string) (string, error
 	return path, nil
 }
 
-// ChecksumError is a downloaded archive whose sha256 isn't the one checksums.txt lists.
+// ChecksumError is a downloaded archive whose sha256 isn't the one the release records for it.
 type ChecksumError struct{ Asset, Want, Got string }
 
 func (e *ChecksumError) Error() string {
 	return fmt.Sprintf("checksum mismatch for %s (want %s, got %s)", e.Asset, e.Want, e.Got)
 }
 
-// VerifyProvenance checks the archive against the release's build attestation with the gh CLI.
+const bundleName = "shulker.attestation.jsonl"
+
+// VerifyProvenance checks the archive against the release's build attestation with the gh CLI:
+// that this repository's release workflow built it.
 func (r *Releases) VerifyProvenance(ctx context.Context, tag, archive string) error {
 	bundle := filepath.Join(filepath.Dir(archive), bundleName)
 	f, err := os.Create(bundle)
@@ -116,7 +139,7 @@ func (r *Releases) VerifyProvenance(ctx context.Context, tag, archive string) er
 	if err != nil {
 		return err
 	}
-	out, err := exec.CommandContext(ctx, "gh", "attestation", "verify", archive, "--bundle", bundle, "--owner", Owner).CombinedOutput()
+	out, err := exec.CommandContext(ctx, "gh", "attestation", "verify", archive, "--bundle", bundle, "--repo", "shulker-sh/shulker", "--signer-workflow", "shulker-sh/shulker/.github/workflows/release.yml").CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("gh attestation verify: %w: %s", err, strings.TrimSpace(string(out)))
 	}
@@ -125,17 +148,6 @@ func (r *Releases) VerifyProvenance(ctx context.Context, tag, archive string) er
 
 func (r *Releases) url(tag, name string) string {
 	return r.DownloadURL + "/" + tag + "/" + name
-}
-
-// ParseChecksums reads a sha256sum listing into a map from file name to hash.
-func ParseChecksums(data string) map[string]string {
-	sums := map[string]string{}
-	for _, line := range strings.Split(data, "\n") {
-		if fields := strings.Fields(line); len(fields) == 2 {
-			sums[fields[1]] = fields[0]
-		}
-	}
-	return sums
 }
 
 // NeedsUpdate reports whether latest is newer than current, a release version; pre-release and

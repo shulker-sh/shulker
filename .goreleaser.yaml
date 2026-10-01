@@ -43,6 +43,8 @@ checksum:
   algorithm: sha256
 
 release:
+  # Published by the workflow's last step: an immutable release takes no more files once it is public.
+  draft: true
   github:
     owner: shulker-sh
     name: shulker

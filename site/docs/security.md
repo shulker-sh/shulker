@@ -36,6 +36,7 @@ Every security warning and error ends by pointing at `shulker security`, and wit
 - **There is no sandbox yet.** A mod can read anything your account can.
 - **There is no malware scanner or known-bad list yet.** The providers don't publish one, and shulker doesn't look inside a jar for you; the commands below let you or an agent look.
 - **A download hash guards the trip, not the file.** Whoever wrote the lock picked the hash.
+- **The install scripts trust GitHub and TLS.** They check the archive against the release's own checksum, and its build provenance only when the GitHub CLI is installed. `shulker self update` is stricter: it only installs a release GitHub has locked against changes, checked against the digest GitHub recorded for it.
 
 ## Commands for Investigating
 

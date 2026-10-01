@@ -1930,7 +1930,7 @@ shulker version --verbose
 
 ### `shulker self update`
 
-Replace the running shulker with the latest release from GitHub. It checks the download against the release's SHA256 checksums and, when the [GitHub CLI](https://cli.github.com) (`gh`) is installed, verifies its build provenance. Without `gh`, it installs on the checksum alone.
+Replace the running shulker with the latest release from GitHub. It only installs an [immutable release](https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/immutable-releases), one GitHub has locked so its files can't be replaced after it was published, and checks the download against the SHA256 GitHub recorded for it then. When the [GitHub CLI](https://cli.github.com) (`gh`) is installed, it also verifies the build provenance: that shulker's own release workflow built the archive. Without `gh`, it installs on the recorded digest alone.
 
 It only replaces a binary that came from a release archive, which is what the install scripts and a GitHub download give you. One installed with `go install` or built from a clone fails `self-update-unmanaged`, naming the command that updates it instead: `go install shulker.sh/shulker@latest`, or `go build .`. `--check` works for every build: it prints the latest release, and the command for this build's route. A build from a clone has no version to compare, so `--check` reports the latest release without saying whether it is newer, and `available` is `null` in JSON. `install` in the JSON names the route: `release`, `go install` or `source`.
 
@@ -2279,9 +2279,10 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `schema-newer` | `shulker.json`, `shulker.lock`, `.shulker/instance.json`, `registry.json`, `config.json` or `accounts.json` was written by a newer shulker, and this one can't read it; the message names both schema versions, and `shulker self update` catches up. A newer `shulker.local.json` or `.shulker/state.json` warns instead, with the same fix |
 | `self-uninstall` | The shulker binary couldn't be removed |
 | `self-update-check` | Checking for a release failed, or none is published for an update (`--check` says so and exits 0) |
-| `self-update-checksum` | The download doesn't match its checksum |
+| `self-update-checksum` | The download doesn't match the SHA256 GitHub recorded for it when the release was published |
 | `self-update-download` | The download failed |
 | `self-update-install` | The running binary couldn't be replaced |
+| `self-update-mutable` | The latest release isn't an immutable one, so its files could have been replaced since it was published. Nothing is installed |
 | `self-update-provenance` | `--require-attestation` is set and the build provenance couldn't be verified |
 | `self-update-unmanaged` | The running binary isn't from a release archive, so shulker can't replace it; the message names what installed it and the command that updates it |
 | `server-exit` | The server exited with an error. `items`: its `logs/latest.log` and, when the server wrote one during the run, its crash report; `data` carries them as `log` and `crashReport` |

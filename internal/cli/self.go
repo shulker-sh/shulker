@@ -203,7 +203,8 @@ func (a *app) selfUpdate(ctx context.Context, check, without, require bool) erro
 		f.Waiting = a.printer.Waiting
 		r = selfupdate.New(f)
 	}
-	tag, err := r.Latest(ctx)
+	rel, err := r.Latest(ctx)
+	tag := rel.Tag
 	switch {
 	case errors.Is(err, fetch.ErrNotFound) && check:
 		b := a.build()
@@ -253,7 +254,12 @@ func (a *app) selfUpdate(ctx context.Context, check, without, require bool) erro
 	defer os.RemoveAll(tmp)
 
 	a.progress("downloading shulker %s", res.Latest)
-	archive, err := r.Download(ctx, tag, tmp)
+	archive, err := r.Download(ctx, rel, tmp)
+	if errors.Is(err, selfupdate.ErrMutable) {
+		e := out.Errorf("self-update-mutable", "shulker %s isn't an immutable release, so GitHub can't vouch that its files are the ones it was published with", res.Latest)
+		e.Help = "download it by hand from https://github.com/shulker-sh/shulker/releases if you trust it"
+		return e
+	}
 	if err != nil {
 		var sum *selfupdate.ChecksumError
 		if errors.As(err, &sum) {
