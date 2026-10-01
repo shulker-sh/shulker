@@ -37,9 +37,11 @@ func Reconcile(e *Env, in config.Instance) (rehooked bool) {
 		var exe string
 		if exe, err = launcher.ShulkerPath(); err == nil {
 			sandboxed := f.Settings.Sandboxed(e.Sandbox)
-			if sandboxed && !sandbox.Supported() {
-				e.Warn("the sandbox isn't available on this system, so %s starts without it.", in.ID)
-				sandboxed = false
+			if sandboxed {
+				if err := sandbox.Available(); err != nil {
+					e.Warn("%s starts without its sandbox: %v.", in.ID, err)
+					sandboxed = false
+				}
 			}
 			r, err = launcher.Reconcile(entry, in, f, exe, sandboxed)
 		}

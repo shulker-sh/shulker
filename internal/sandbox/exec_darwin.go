@@ -1,16 +1,19 @@
 package sandbox
 
 import (
+	"errors"
 	"os"
 	"syscall"
 )
 
 const sandboxExec = "/usr/bin/sandbox-exec"
 
-// Supported reports whether this machine can sandbox a game.
-func Supported() bool {
-	_, err := os.Stat(sandboxExec)
-	return err == nil
+// Available is nil when this machine can sandbox a game, and otherwise says why not.
+func Available() error {
+	if _, err := os.Stat(sandboxExec); err != nil {
+		return errors.New("sandbox-exec is missing from this Mac")
+	}
+	return nil
 }
 
 // Exec replaces this process with Java under the policy, and only returns when that fails.

@@ -99,8 +99,8 @@ func (e *Env) SandboxWords(id string, s instance.Settings) []string {
 	if !s.Sandboxed(e.Sandbox) {
 		return nil
 	}
-	if !sandbox.Supported() {
-		e.Warn("the sandbox isn't available on this system, so %s starts without it.", id)
+	if err := sandbox.Available(); err != nil {
+		e.Warn("%s starts without its sandbox: %v.", id, err)
 		return nil
 	}
 	exe, err := launcher.ShulkerPath()

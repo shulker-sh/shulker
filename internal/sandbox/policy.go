@@ -37,6 +37,9 @@ type Options struct {
 	ProtectFiles []string
 }
 
+// Supported reports whether this machine can sandbox a game.
+func Supported() bool { return Available() == nil }
+
 // ErrNoGameDir is an argv that names no --gameDir, so there is nothing to confine the game to.
 var ErrNoGameDir = errors.New("the java arguments name no --gameDir")
 
