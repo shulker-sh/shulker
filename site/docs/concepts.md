@@ -1,5 +1,5 @@
 ---
-description: How manifests, locks, sides, overrides, build edits, modpacks, instances, and providers fit together.
+description: How manifests, locks, sides, dependencies, overrides, features, modpacks, instances, history, saves, and providers fit together.
 outline: [2, 3]
 ---
 
@@ -20,6 +20,16 @@ A project has a client side, a server side, or both, and each is a build output,
 Every mod has a side too, `client`, `server`, or `both`. Shulker reads it from the provider, then from the jar: Fabric's and Quilt's metadata name one, and a NeoForge or Forge jar, whose `mods.toml` names none, is `client` when it declares dependencies and every one is `side = "CLIENT"`, since the loader skips those on a server and the mod then fails there. Anything else is `both`. You can override it with `side` on the mod, and the lock's `sideFrom` records which of these decided. A side only gets mods for itself plus those marked `both`, so client-only mods like Iris never end up on a server. A dependency a jar declares for one side only is checked only on that side. Resource packs and shaders are always client-only, and a server build leaves them out.
 
 A server build writes `eula.txt` once you have accepted the [Minecraft EULA](https://aka.ms/MinecraftEULA). The first [`shulker serve`](/docs/cli#shulker-serve) asks and records your answer in your Shulker config rather than the manifest, so no project asks again, and a manifest cannot accept it for you.
+
+## Dependencies
+
+Shulker reads each mod's dependencies from the jar's own metadata, not from the provider's page, and checks them for every side the project declares. `add`, `remove`, `update`, `lock` and `install` all run the check, so a mod whose dependency is missing or the wrong version fails there rather than in the game.
+
+- Each side is checked against the mods its own build places. A client mod that needs a server-only mod fails, since the client build leaves that mod out, and a problem only one side has names the side.
+- A problem you know is harmless is accepted with [`shulker ignore`](/docs/cli#shulker-ignore). The problem prints the exact command to run. The entry lands in [`ignore`](/docs/manifest#ignore) in `shulker.json` with a note saying why, and holds only while the jar declares that same range, so a new version that declares another brings the problem back.
+- The loader's own dependency overrides apply first. On Fabric that is `config/fabric_loader_dependencies.json`, and on NeoForge for Minecraft 1.21.1 and later the `dependencyOverrides` table of `config/fml.toml`, each as the build lays it from your overrides. A dependency the file removes needs no ignore. Quilt's `config/quilt-loader-overrides.json` isn't applied, and a build that places one warns.
+- [`shulker suggests`](/docs/cli#shulker-suggests) lists the mods your locked mods recommend that aren't installed, and `--optional` adds their optional dependencies.
+- [`shulker check`](/docs/cli#shulker-check) runs the same check without writing anything, for CI. See [GitHub Actions](/docs/github-actions).
 
 ## Overrides
 
@@ -46,6 +56,33 @@ A built-in with nothing to fill it, like `${project.version}` in a manifest with
 ### Excluded Files
 
 Folder metadata your operating system leaves behind (`.DS_Store`, `._*` files, `Thumbs.db`, `desktop.ini`) never goes into a build or an export, and the manifest's [`skipFiles`](/docs/manifest) leaves out more by glob.
+
+## Features
+
+A feature is a named, optional part of a pack, like `shaders`, that each player switches on or off for their own machine. [`features`](/docs/manifest#featuredecl) in `shulker.json` declares each one and whether it starts on, and a `requires` entry joins it with `feature`.
+
+```json
+"features": { "shaders": { "default": true } },
+"requires": {
+  "iris": { "feature": "shaders" },
+  "sodium-extra": { "feature": "!shaders" }
+}
+```
+
+- An entry gated on a feature ships only while the feature is on, and `!name` ships it only while the feature is off. A list of names is any-of, and every `!name` in it has to hold as well.
+- A dependency that only gated-out mods need is left out with them. A gated-out mod that a mod still in the build requires is kept, and the build warns.
+- A feature brings its own override folder, `<feature>-overrides/` unless its `overrides` names another, laid over the base folders while it is on. See [Overrides](#overrides).
+- [`shulker feature on|off`](/docs/cli#shulker-feature-on-off) records your choice in `shulker.local.json` beside the manifest, which is per machine and kept out of git. `feature reset` goes back to the declared default, and `feature list` shows each feature with the mods it gates.
+- `--with` and `--without` on `build`, `install`, `sync` and `export` decide a feature for one run, over both your choice and the default.
+- A linked instance keeps its own choices, so `shulker feature on shaders -i <id>` turns a feature on for one instance and leaves the project alone.
+
+### Operating Systems
+
+An entry can also be held to an operating system with `os`, which takes `macos`, `windows` or `linux`, or `!name` to leave one out. It is decided where the build runs, and it combines with `feature`, so both have to hold.
+
+```json
+"requires": { "controlify": { "os": "!macos" } }
+```
 
 ## Edits in the Build Directory
 
@@ -97,6 +134,68 @@ A linked instance syncs from its source before each launch. The launcher runs a 
 ### Instances Shulker Owns
 
 An instance Shulker owns is one it launches itself. [`shulker play`](/docs/cli#shulker-play) syncs it, fetches the game, its libraries and the loader into a shared store, and starts the game as an [account](/docs/cli#shulker-accounts) you signed in with `shulker accounts login`, an offline account, or one read from another launcher's files. Those instances share their worlds through [save groups](/docs/cli#shulker-saves), and `backup` and `restore` zip and put back the worlds of any instance.
+
+### Instance Settings
+
+Every instance has its own settings in [`.shulker/instance.json`](/docs/instance), which are per machine and never part of the pack. [`shulker instance set`](/docs/cli#shulker-instance) changes one, for the instance the current directory is or the one `-i` names.
+
+```sh
+shulker instance set memory 8G
+shulker instance set window 1920x1080 -i smp
+shulker instance set jvmArgs --literal '["-XX:+UseZGC"]'
+```
+
+- `memory`, `jvmArgs` and `window` apply in every launcher. Under `shulker play` they are the heap size, extra JVM arguments and window size of the launch, and for an instance in another launcher Shulker writes them into that launcher's own settings at each link, sync or repair. ATLauncher keeps one window size for every instance, so `window` there warns instead.
+- A setting you leave unset leaves the other launcher's own value alone. Under `shulker play` it falls back to the `play.` default in your config, which [`shulker config set`](/docs/cli#shulker-config-set) sets for every instance at once, and for `memory` then to the pack's `client.memory`, and then to `4G`.
+- `java` and `wrapper` point the launch at a Java of your own and a command to run it through, such as `gamemoderun`.
+- `sandbox` runs the game out of reach of the rest of your home folder, in every launcher. It is experimental. See [The Sandbox](/docs/security#the-sandbox).
+- `account` picks the account `shulker play` launches the instance as, over the default.
+- `hooks.preLaunch` and `hooks.postExit` turn the sync before each launch, and the record of each run, on or off.
+
+### The Pack in Its Launcher
+
+A linked instance carries the pack's name and icon into its launcher. [`icon`](/docs/manifest#properties) in `shulker.json` names a PNG in the project, and each launcher shows it, fitted to the launcher's own shape. A sync replaces the launcher's image only when the pack's icon changes, so one you picked yourself stays until then. Exports carry the icon too.
+
+### The Mod List Entry
+
+A client build includes a small marker mod, which gives the pack its own entry in the in-game mod list, with its name, `description`, icon and [`links`](/docs/manifest#links).
+
+- The entry shows what Shulker wants you to know about the instance. A Notices section names files gone from their provider and jars changed since Shulker placed them, and the last 30 days of syncs each get a section listing what they changed.
+- The marker is also how an export of the build is recognised as this pack again.
+- `"marker": false` in `shulker.json` leaves it out, and `shulker instance set marker false` does the same for one instance.
+
+## History and Rollback
+
+An instance keeps the states it was in before it changed, so an update that breaks the game can be undone.
+
+- An entry is taken before anything is rewritten. `add`, `remove`, `update` and `lock` take one before they save `shulker.json` and `shulker.lock`, and an in-place build takes one before it writes over a file you changed.
+- An entry holds the manifest, the lock, the whole `config` directory and every other file the build manages. Mod and pack files aren't copied, since the restored lock brings them back from the [cache](#cache).
+- [`shulker history list`](/docs/cli#shulker-history-list) lists the entries, newest first, and `history show` says what restoring one would bring back, remove and change.
+- [`shulker rollback`](/docs/cli#shulker-rollback) restores an entry and builds it in place. The current state is kept as an entry first, so a rollback can itself be rolled back.
+- [`history`](/docs/manifest#properties) in `shulker.json` is how many entries `history prune` keeps, 5 by default. Nothing else deletes history, and a build over that number only warns. `-1` keeps every entry, and `0` takes none.
+
+Only a project with a side that builds in place keeps history, which is every linked instance.
+
+## Saves and Backups
+
+History covers the pack's files, and backups cover the worlds.
+
+### Save Groups
+
+Every instance Shulker owns shares its worlds through a save group. Its `saves/` folder is a link to the group's folder, so every instance in a group lists the same worlds, and a new instance of another pack opens the worlds you already have. Each instance joins the `default` group.
+
+- `shulker instance set savesGroup <name>` moves an instance to another group, and `none` keeps its worlds in the instance. Nothing is copied or merged, and leaving a group leaves its worlds there.
+- Instances in other launchers keep their own worlds.
+- [`shulker saves`](/docs/cli#shulker-saves) lists the groups, or one group's or instance's worlds and backups.
+
+### Backups
+
+[`shulker backup`](/docs/cli#shulker-backup) zips the worlds of a save group, an instance in any launcher, or a server, and [`shulker restore`](/docs/cli#shulker-restore) puts them back.
+
+- An `update` or a `sync` that changes the mods backs the worlds up first, and keeps the newest five of those automatic backups. `play.saveBackups` in your config changes the number.
+- A backup you take yourself is never deleted automatically. [`shulker saves prune`](/docs/cli#shulker-saves-prune) deletes backups, and always says how many it keeps.
+- A restore backs up the worlds that are there first, so it can be undone, and replaces each world whole rather than merging files. `--world` restores only the worlds you name.
+- A restore refuses to replace a world a running game or server has open. Quit to the title screen, or stop the server, first.
 
 ## Resource Packs and Shaders
 

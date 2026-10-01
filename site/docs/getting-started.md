@@ -133,6 +133,8 @@ Some launchers need a word more.
 - **MultiMC** has no default folder, so `shulker link multimc` needs `--launcher-dir`.
 - **Modrinth App and the CurseForge app** cannot run a command before a launch, so Shulker only exports to them. The pack they import is a snapshot that does not follow your project.
 
+A linked instance shows the pack's icon in its launcher, and its own memory, JVM arguments and window size apply in each. See [Instance Settings](/docs/concepts#instance-settings).
+
 Turn the hooks off with `--no-hooks`, or one of them with `--no-pre-launch` or `--no-post-exit`. Each `link` command is described under [`shulker link`](/docs/cli#shulker-link) in the CLI Reference.
 
 ## Run a Server
@@ -149,7 +151,7 @@ An existing project gains a server side when you add `"server": {}` to its `shul
 
 ## Next Steps
 
-- [Concepts](/docs/concepts) explains manifests, locks, sides, modpacks, and instances.
+- [Concepts](/docs/concepts) explains manifests, locks, sides, dependencies, features, modpacks, instances, history and saves.
 - The [CLI Reference](/docs/cli) covers every command.
 - The [Manifest Reference](/docs/manifest) lists every field in `shulker.json`.
 - [GitHub Actions](/docs/github-actions) checks a pack on every push and releases it from a tag.
