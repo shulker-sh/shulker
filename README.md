@@ -59,7 +59,7 @@ shulker play
 
 Launching the game needs a Microsoft account that owns Minecraft. See [Minecraft Accounts](#minecraft-accounts) below for how to sign one in, or how to use an account another launcher has already signed in.
 
-The `create` command will use the manifest defaults unless overridden. If you want to interactively walk through these options, run the `shulker init` command instead. With no flags at all, `create` makes a vanilla Minecraft client on the latest release. Every default is listed [in the CLI reference](https://shulker.sh/docs/cli#shulker-create).
+The `create` command will use the manifest defaults unless overridden. If you want to interactively walk through these options, run the `shulker init` command instead. With no flags at all, `create` makes a vanilla Minecraft client on the latest release. Every default is listed in the [CLI Reference](https://shulker.sh/docs/cli#shulker-create).
 
 To create a server manifest instead, run these commands.
 
@@ -108,7 +108,7 @@ Some launchers need a word more.
 - **MultiMC** has no default folder, so `shulker link multimc` needs `--launcher-dir`.
 - **Modrinth App and the CurseForge app** cannot run a command before a launch, so Shulker only exports to them. The pack they import is a snapshot that does not follow your project.
 
-Turn the hooks off with `--no-hooks`, or one of them with `--no-pre-launch` or `--no-post-exit`. Each `link` command is described in the [CLI Reference](https://shulker.sh/docs/cli#shulker-link).
+A linked instance shows the pack's icon in its launcher, and its own memory, JVM arguments and window size, set with `shulker instance set`, apply in each. Turn the hooks off with `--no-hooks`, or one of them with `--no-pre-launch` or `--no-post-exit`. Each `link` command is described in the [CLI Reference](https://shulker.sh/docs/cli#shulker-link).
 
 ## Minecraft Accounts
 
@@ -162,9 +162,14 @@ These commands are what most projects need.
 | `shulker link <launcher>` | Create an instance in a launcher that follows the project and syncs from it before each launch |
 | `shulker play` | Build, fetch and start the instance Shulker owns for the project |
 | `shulker sync` | Update a linked instance from its pack with `-i`, or build a project, git URL or manifest URL straight into a directory |
+| `shulker feature on\|off <feature>` | Turn an optional part of the pack, such as its shaders, on or off on this machine |
+| `shulker rollback` | Put an instance back as it was before its last change, from the history it keeps |
+| `shulker backup`, `shulker restore` | Zip an instance's or save group's worlds, and put a backup back |
 | `shulker serve` | Build the server side and run it in the foreground, downloading what the lock needs first |
 | `shulker import <pack>` | Create a project from a `.mrpack`, a CurseForge zip or a Modrinth slug, or merge one into the project |
 | `shulker export mrpack\|curseforge` | Export the project as a Modrinth `.mrpack`, or the client as a CurseForge profile zip |
+| `shulker check` | Fail when the lock is stale, a locked file can't be fetched, or a mod's dependencies aren't met, for CI |
+| `shulker security`, `shulker audit` | List what Shulker does to keep a bad file off your machine, and report what in a pack deserves a closer look |
 | `shulker accounts` | List every account Shulker can see, with `login`, `add`, `use` and `stores` under it |
 
 To see the full list of commands, run `shulker --help` or read the [CLI Reference](https://shulker.sh/docs/cli).
@@ -172,7 +177,7 @@ To see the full list of commands, run `shulker --help` or read the [CLI Referenc
 ## Documentation
 
 - [Getting Started](https://shulker.sh/docs/getting-started) walks through installation, a first project, playing and serving.
-- [Concepts](https://shulker.sh/docs/concepts) explains manifests, locks, sides, modpacks and instances.
+- [Concepts](https://shulker.sh/docs/concepts) explains manifests, locks, sides, dependencies, features, modpacks, instances, history and saves.
 - The [CLI Reference](https://shulker.sh/docs/cli) covers every command, and the [Manifest Reference](https://shulker.sh/docs/manifest) every field of `shulker.json`.
 - [GitHub Actions](https://shulker.sh/docs/github-actions) checks a pack on every push and releases it from a tag.
 - [Security](https://shulker.sh/docs/security) lists what Shulker checks before a file reaches your machine, and how to look into a pack yourself.
