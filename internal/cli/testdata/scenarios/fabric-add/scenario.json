@@ -1,0 +1,13 @@
+{
+  "steps": [
+    {
+      "run": ["create", "--fabric", "--minecraft", "1.21.1", "--json"],
+      "expect": {"ok": true}
+    },
+    {
+      "run": ["add", "sodium", "--json"],
+      "expect": {"ok": true, "data": {"added": [{"id": "sodium", "side": "client"}]}},
+      "reject": {"data": {"added": [{"id": "fabric-api"}]}}
+    }
+  ]
+}

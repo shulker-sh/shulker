@@ -22,11 +22,21 @@ func TrustTestServers() {
 // Routed is a client that sends a request for any of hosts to srv, so a test can name the real
 // hosts a check allows. A host starting with a dot stands for every host ending in it.
 func Routed(srv *httptest.Server, hosts ...string) *http.Client {
+	return routedBy(srv, func(host string) bool { return routes(hosts, host) })
+}
+
+// Everything is a client that sends every request to srv, whatever its host, so nothing a test
+// runs can reach the network.
+func Everything(srv *httptest.Server) *http.Client {
+	return routedBy(srv, func(string) bool { return true })
+}
+
+func routedBy(srv *httptest.Server, routed func(host string) bool) *http.Client {
 	t := http.DefaultTransport.(*http.Transport).Clone()
 	t.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	var d net.Dialer
 	t.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-		if host, _, err := net.SplitHostPort(addr); err == nil && routes(hosts, host) {
+		if host, _, err := net.SplitHostPort(addr); err == nil && routed(host) {
 			addr = srv.Listener.Addr().String()
 		}
 		return d.DialContext(ctx, network, addr)

@@ -1,0 +1,376 @@
+package cli
+
+import (
+	"archive/zip"
+	"bytes"
+	"cmp"
+	"compress/gzip"
+	"crypto/sha1"
+	"crypto/sha512"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
+	"maps"
+	"net/http"
+	"net/url"
+	"os"
+	"slices"
+	"strconv"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"shulker.sh/shulker/internal/provider/curseforge"
+)
+
+// recording is a scenario's responses.json.gz: every response the steps got from the real
+// services, and the files they downloaded, kept as the metadata a jar is rebuilt from.
+type recording struct {
+	// Recorded is when the recording was made, the time a replay runs at.
+	Recorded  time.Time      `json:"recorded"`
+	Exchanges []exchange     `json:"exchanges"`
+	Files     []recordedFile `json:"files"`
+}
+
+// exchange is one request and the response it got. A request's body is kept for a POST, whose
+// ids CurseForge and Modrinth take in the body rather than the URL.
+type exchange struct {
+	Method      string            `json:"method"`
+	URL         string            `json:"url"`
+	RequestBody string            `json:"requestBody,omitempty"`
+	Status      int               `json:"status"`
+	Header      map[string]string `json:"header,omitempty"`
+	Body        string            `json:"body"`
+}
+
+// recordedFile is a downloaded file: where it came from, the real file's sha1, sha512, size and
+// CurseForge fingerprint, and what is kept of its contents.
+type recordedFile struct {
+	URL         string      `json:"url"`
+	Sha1        string      `json:"sha1"`
+	Sha512      string      `json:"sha512"`
+	Size        int64       `json:"size"`
+	Fingerprint uint32      `json:"fingerprint"`
+	Jar         recordedJar `json:"jar"`
+}
+
+// recordedJar is what a jar keeps of itself: its metadata files by path, and its nested jars by
+// path, each kept the same way.
+type recordedJar struct {
+	Files map[string]string      `json:"files,omitempty"`
+	Jars  map[string]recordedJar `json:"jars,omitempty"`
+}
+
+func readRecording(path string) (*recording, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	zr, err := gzip.NewReader(f)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	var rec recording
+	if err := json.NewDecoder(zr).Decode(&rec); err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	return &rec, nil
+}
+
+func (j recordedJar) build() ([]byte, error) {
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	for _, name := range slices.Sorted(maps.Keys(j.Files)) {
+		w, err := zw.Create(name)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := io.WriteString(w, j.Files[name]); err != nil {
+			return nil, err
+		}
+	}
+	for _, name := range slices.Sorted(maps.Keys(j.Jars)) {
+		nested, err := j.Jars[name].build()
+		if err != nil {
+			return nil, err
+		}
+		w, err := zw.Create(name)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := w.Write(nested); err != nil {
+			return nil, err
+		}
+	}
+	if err := zw.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// rebuilt is a recorded file built again from its metadata, beside the real values it stands in for.
+type rebuilt struct {
+	real        recordedFile
+	data        []byte
+	sha1        string
+	sha512      string
+	fingerprint uint32
+}
+
+// replay serves a recording: each file rebuilt, and every body with the real files' hashes and
+// sizes swapped for the rebuilt ones'. A request it lacks gets a 404 and is kept as a miss.
+type replay struct {
+	responses map[string]exchange
+	files     map[string]*rebuilt
+	mu        sync.Mutex
+	misses    []string
+}
+
+func newReplay(rec *recording) (*replay, error) {
+	r := &replay{responses: map[string]exchange{}, files: map[string]*rebuilt{}}
+	var all []*rebuilt
+	for _, f := range rec.Files {
+		data, err := f.Jar.build()
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", f.URL, err)
+		}
+		s1, s512 := sha1.Sum(data), sha512.Sum512(data)
+		b := &rebuilt{real: f, data: data, sha1: hex.EncodeToString(s1[:]), sha512: hex.EncodeToString(s512[:]), fingerprint: curseforge.Fingerprint(data)}
+		r.files[f.URL] = b
+		all = append(all, b)
+	}
+	rw := newRewriter(all)
+	for _, ex := range rec.Exchanges {
+		ex.Body = rw.rewrite(ex.Body)
+		key, err := requestKey(ex.Method, ex.URL, rw.rewrite(ex.RequestBody))
+		if err != nil {
+			return nil, err
+		}
+		if _, ok := r.responses[key]; !ok {
+			r.responses[key] = ex
+		}
+	}
+	return r, nil
+}
+
+func (r *replay) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	u := "https://" + req.Host + req.URL.RequestURI()
+	if f, ok := r.files[u]; ok && req.Method == http.MethodGet {
+		http.ServeContent(w, req, "", time.Time{}, bytes.NewReader(f.data))
+		return
+	}
+	body, _ := io.ReadAll(req.Body)
+	key, err := requestKey(req.Method, u, string(body))
+	ex, ok := r.responses[key]
+	if err != nil || !ok {
+		r.mu.Lock()
+		r.misses = append(r.misses, req.Method+" "+req.Host+req.URL.RequestURI())
+		r.mu.Unlock()
+		http.Error(w, "not in the recording", http.StatusNotFound)
+		return
+	}
+	for name, value := range ex.Header {
+		w.Header().Set(name, value)
+	}
+	w.WriteHeader(ex.Status)
+	_, _ = io.WriteString(w, ex.Body)
+}
+
+// takeMisses returns the requests the recording lacked since the last call.
+func (r *replay) takeMisses() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	misses := r.misses
+	r.misses = nil
+	return misses
+}
+
+// requestKey is what a request is looked up by: its method, host, path, query in a fixed order,
+// and its body, with a JSON body's spacing and key order normalised.
+func requestKey(method, rawURL, body string) (string, error) {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return "", err
+	}
+	var v any
+	if json.Unmarshal([]byte(body), &v) == nil {
+		sortFingerprints(v)
+		normal, _ := json.Marshal(v)
+		body = string(normal)
+	}
+	return method + " " + u.Host + u.EscapedPath() + "?" + u.Query().Encode() + "\n" + body, nil
+}
+
+// sortFingerprints puts a fingerprint lookup's list in order: it is a set, and CurseForge's Filed
+// sorts it, so rebuilt fingerprints would otherwise come in another order than the real ones did.
+func sortFingerprints(v any) {
+	body, ok := v.(map[string]any)
+	if !ok {
+		return
+	}
+	list, ok := body["fingerprints"].([]any)
+	if !ok {
+		return
+	}
+	slices.SortFunc(list, func(a, b any) int {
+		x, _ := a.(float64)
+		y, _ := b.(float64)
+		return cmp.Compare(x, y)
+	})
+}
+
+// sizeKeys and fingerprintKeys are the keys whose numbers are a file's size or fingerprint, in
+// any service's responses, and in the fingerprint lookup CurseForge takes.
+var (
+	sizeKeys        = []string{"size", "fileLength", "fileSizeOnDisk"}
+	fingerprintKeys = []string{"fileFingerprint", "fingerprints"}
+)
+
+// rewriter swaps the real files' values for the rebuilt ones' in a body: a hash string wherever it
+// appears, and a number only under a size or fingerprint key. Two files can share a size, so a
+// number goes to the file whose hash sits in the same object, if any does.
+type rewriter struct {
+	hashes *strings.Replacer
+	files  []*rebuilt
+	byHash map[string]*rebuilt
+}
+
+func newRewriter(files []*rebuilt) *rewriter {
+	// A Replacer tries its pairs in order, so every sha512 goes before any sha1 that could be its prefix.
+	var long, short []string
+	byHash := map[string]*rebuilt{}
+	for _, f := range files {
+		long = append(long, f.real.Sha512, f.sha512)
+		short = append(short, f.real.Sha1, f.sha1)
+		byHash[f.sha1], byHash[f.sha512] = f, f
+	}
+	return &rewriter{hashes: strings.NewReplacer(append(long, short...)...), files: files, byHash: byHash}
+}
+
+func (rw *rewriter) rewrite(body string) string {
+	if body == "" || len(rw.files) == 0 {
+		return body
+	}
+	body = rw.hashes.Replace(body)
+	dec := json.NewDecoder(strings.NewReader(body))
+	dec.UseNumber()
+	var v any
+	if dec.Decode(&v) != nil {
+		return body
+	}
+	v, _ = rw.numbers(v)
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if enc.Encode(v) != nil {
+		return body
+	}
+	return strings.TrimSuffix(buf.String(), "\n")
+}
+
+// numbers rewrites the size and fingerprint numbers in v, returning it with the rebuilt files
+// whose hashes appear anywhere inside it.
+func (rw *rewriter) numbers(v any) (any, []*rebuilt) {
+	switch v := v.(type) {
+	case string:
+		if f, ok := rw.byHash[v]; ok {
+			return v, []*rebuilt{f}
+		}
+	case []any:
+		var found []*rebuilt
+		for i, child := range v {
+			var in []*rebuilt
+			v[i], in = rw.numbers(child)
+			found = append(found, in...)
+		}
+		return v, found
+	case map[string]any:
+		var found []*rebuilt
+		for key, child := range v {
+			var in []*rebuilt
+			v[key], in = rw.numbers(child)
+			found = append(found, in...)
+		}
+		for key, child := range v {
+			switch {
+			case slices.Contains(sizeKeys, key):
+				v[key] = rw.number(child, found, func(f *rebuilt) (int64, int64) { return f.real.Size, int64(len(f.data)) })
+			case slices.Contains(fingerprintKeys, key):
+				v[key] = rw.number(child, found, func(f *rebuilt) (int64, int64) { return int64(f.real.Fingerprint), int64(f.fingerprint) })
+			}
+		}
+		return v, found
+	}
+	return v, nil
+}
+
+// number swaps a real value for its rebuilt one, through an array of them too: the value of a
+// file in scope if one has it, else of every file that has it, when they all agree.
+func (rw *rewriter) number(v any, scope []*rebuilt, values func(*rebuilt) (real, rebuilt int64)) any {
+	if list, ok := v.([]any); ok {
+		for i, item := range list {
+			list[i] = rw.number(item, scope, values)
+		}
+		return list
+	}
+	n, ok := v.(json.Number)
+	if !ok {
+		return v
+	}
+	real, err := n.Int64()
+	if err != nil {
+		return v
+	}
+	pick := func(files []*rebuilt) (int64, bool) {
+		var out []int64
+		for _, f := range files {
+			if r, b := values(f); r == real {
+				out = append(out, b)
+			}
+		}
+		slices.Sort(out)
+		out = slices.Compact(out)
+		if len(out) != 1 {
+			return 0, false
+		}
+		return out[0], true
+	}
+	if b, ok := pick(scope); ok {
+		return json.Number(strconv.FormatInt(b, 10))
+	}
+	if b, ok := pick(rw.files); ok {
+		return json.Number(strconv.FormatInt(b, 10))
+	}
+	return v
+}
+
+func TestRewriterSwapsHashesAndOnlyFileNumbers(t *testing.T) {
+	a := &rebuilt{real: recordedFile{Sha1: strings.Repeat("a", 40), Sha512: strings.Repeat("a", 128), Size: 500, Fingerprint: 7}, data: make([]byte, 10), sha1: strings.Repeat("1", 40), sha512: strings.Repeat("1", 128), fingerprint: 70}
+	b := &rebuilt{real: recordedFile{Sha1: strings.Repeat("b", 40), Sha512: strings.Repeat("b", 128), Size: 500, Fingerprint: 8}, data: make([]byte, 20), sha1: strings.Repeat("2", 40), sha512: strings.Repeat("2", 128), fingerprint: 80}
+	rw := newRewriter([]*rebuilt{a, b})
+	body := fmt.Sprintf(`{"downloads":500,"files":[{"hashes":[{"value":%q}],"fileLength":500,"fileFingerprint":7},{"sha1":%q,"size":500}],"note":"sha %s"}`, a.real.Sha1, b.real.Sha1, b.real.Sha512)
+	want := fmt.Sprintf(`{"downloads":500,"files":[{"fileFingerprint":70,"fileLength":10,"hashes":[{"value":%q}]},{"sha1":%q,"size":20}],"note":"sha %s"}`, a.sha1, b.sha1, b.sha512)
+	if got := rw.rewrite(body); got != want {
+		t.Fatalf("got  %s\nwant %s", got, want)
+	}
+	if got := rw.rewrite(`{"fingerprints":[8,7,9]}`); got != `{"fingerprints":[80,70,9]}` {
+		t.Fatalf("fingerprint lookup: %s", got)
+	}
+	if got := rw.rewrite(`{"size":500}`); got != `{"size":500}` {
+		t.Fatalf("a size two files share was guessed: %s", got)
+	}
+	if got := rw.rewrite("<sha1>" + a.real.Sha1 + "</sha1>"); got != "<sha1>"+a.sha1+"</sha1>" {
+		t.Fatalf("a hash outside JSON: %s", got)
+	}
+}
+
+func TestFingerprintLookupMatchesInAnyOrder(t *testing.T) {
+	recorded, _ := requestKey("POST", "https://api.curseforge.com/v1/fingerprints", `{"fingerprints":[30,10,20]}`)
+	sent, _ := requestKey("POST", "https://api.curseforge.com/v1/fingerprints", `{"fingerprints": [10, 20, 30]}`)
+	if recorded != sent {
+		t.Fatalf("%q != %q", recorded, sent)
+	}
+}

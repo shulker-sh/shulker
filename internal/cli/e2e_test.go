@@ -150,6 +150,8 @@ type harness struct {
 	grace time.Duration
 	// installerFetchedClient says a client install found no vanilla jar and downloaded one itself.
 	installerFetchedClient bool
+	// replay, when set, answers every request in place of the fakes, at the services' real URLs.
+	replay *replay
 }
 
 // watch stands in for the watcher process, because a test binary re-execed is a test binary and not
@@ -577,7 +579,13 @@ func newHarness(t *testing.T) *harness {
 	h.runtime.register(mux, func() string { return base })
 	h.registerCurseForge(t, mux, func() string { return base })
 	h.msa = h.fakeSignIn(mux)
-	h.server = httptest.NewTLSServer(mux)
+	h.server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if h.replay != nil {
+			h.replay.ServeHTTP(w, r)
+			return
+		}
+		mux.ServeHTTP(w, r)
+	}))
 	base = h.server.URL
 	library := func(name, path string) map[string]any {
 		jar, ok := h.neoLibs[path]
@@ -814,22 +822,25 @@ func (h *harness) newApp(stdout, stderr io.Writer) *app {
 	}
 	f := fetch.New("test")
 	f.HTTP = fetchtest.Routed(h.server, append(slices.Clone(packarchive.MrpackHosts), "edge.forgecdn.net")...)
+	if h.replay != nil {
+		f.HTTP = fetchtest.Everything(h.server)
+	}
 	piston := mojang.NewPiston(f)
-	piston.ManifestURL = h.server.URL + "/piston/manifest.json"
+	piston.ManifestURL = h.at(piston.ManifestURL, "/piston/manifest.json")
 	mr := modrinth.New(f)
-	mr.BaseURL = h.server.URL + "/modrinth"
+	mr.BaseURL = h.at(mr.BaseURL, "/modrinth")
 	runtimes := mojang.NewRuntimes(f)
-	runtimes.IndexURL = h.server.URL + "/jrt/all.json"
+	runtimes.IndexURL = h.at(runtimes.IndexURL, "/jrt/all.json")
 	profiles := mojang.NewProfiles(f)
-	profiles.APIURL = h.server.URL + "/mojang"
-	profiles.SessionURL = h.server.URL + "/session"
+	profiles.APIURL = h.at(profiles.APIURL, "/mojang")
+	profiles.SessionURL = h.at(profiles.SessionURL, "/session")
 	players := player.NewResolver(profiles)
 	key := curseForgeTestKey
 	if h.noCurseForge {
 		key = ""
 	}
 	cf := curseforge.New(f, key)
-	cf.BaseURL = h.server.URL + "/curseforge"
+	cf.BaseURL = h.at(cf.BaseURL, "/curseforge")
 	providers := provider.Providers{mr.Name(): mr, cf.Name(): cf}
 	c := &cache.Cache{Dir: h.cache}
 	loaders := &loader.Remote{Fetch: f, Cache: c, Log: a.progress, RunInstaller: a.installer}
@@ -847,10 +858,19 @@ func (h *harness) newApp(stdout, stderr io.Writer) *app {
 	if !h.now.IsZero() {
 		a.d.Now = func() time.Time { return h.now }
 	}
-	a.d.metaURLs = map[string]string{launcher.GDLauncherMetaURL: h.server.URL + "/gdl"}
+	a.d.metaURLs = map[string]string{launcher.GDLauncherMetaURL: h.at(launcher.GDLauncherMetaURL, "/gdl")}
 	a.d.signin = h.msa.signIn(f, h.server.URL)
-	a.d.resources = h.server.URL + "/resources"
+	a.d.resources = h.at(a.d.resources, "/resources")
 	return a
+}
+
+// at is where a service is reached: the real URL under a replay, which serves it there, and
+// otherwise the fake at path on the harness's server.
+func (h *harness) at(real, path string) string {
+	if h.replay != nil {
+		return real
+	}
+	return h.server.URL + path
 }
 
 func (h *harness) mustRunStderr(t *testing.T, args ...string) (string, string) {
