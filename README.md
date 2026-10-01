@@ -126,9 +126,9 @@ If you are already signed in to another launcher (Prism Launcher, MultiMC, the M
 ❯ shulker accounts stores add prism
 ~ accounts.stores ["shulker"] → ["shulker","prism"]
 ❯ shulker accounts
-     Account  UUID                                  Group     State
-  ✔  Steve    8667ba71-b85a-3d5b-af5f-cb2f6e9c7d21  own       playable
-     Notch    069a79f4-44e9-4726-a5be-fca90e38aaf5  launcher  playable
+     Account  UUID                                  Launcher        State
+  ✔  Steve    8667ba71-b85a-3d5b-af5f-cb2f6e9c7d21  Shulker         playable
+     Notch    069a79f4-44e9-4726-a5be-fca90e38aaf5  Prism Launcher  playable
 ❯ shulker accounts use Notch
 ✔ Notch is now the default account (069a79f4-44e9-4726-a5be-fca90e38aaf5)
 ```
@@ -144,9 +144,12 @@ Offline accounts need a Microsoft account too. Shulker refuses to create one unt
 Sign in to Microsoft:
   $ shulker accounts login
 ❯ shulker accounts login
-✔ signed in as Steve (8667ba71-b85a-3d5b-af5f-cb2f6e9c7d21)
+✔ Signed in as Steve, now the default account (8667ba71-b85a-3d5b-af5f-cb2f6e9c7d21)
 ❯ shulker accounts add Alex
-✔ created the offline account Alex (36532b5e-c442-3dbb-a24c-c7e55d0f979a)
+✔ Created offline account Alex
+
+Make it the default account:
+  $ shulker accounts use Alex
 ```
 
 ## Commands
