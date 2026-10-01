@@ -62,7 +62,7 @@ type Protection struct {
 }
 
 var protections = []Protection{
-	{ID: Paths, On: true, Summary: "No path in a pack, lock or manifest can reach outside its folder, so a pack can't write over files elsewhere on your machine."},
+	{ID: Paths, On: true, Summary: "No path in a pack, lock or manifest can reach outside its folder or into shulker's own files for an instance, so a pack can't write over files elsewhere on your machine or change how the game is started."},
 	{ID: OverrideSymlinks, On: true, Summary: "Symlinks in a source's override folders are skipped, so one can't copy a file from elsewhere on your disk, like an SSH key, into an instance."},
 	{ID: HTTPS, On: true, Summary: "Every download, API call and redirect uses https, and every git remote https or ssh, so nothing can be swapped on its way to you."},
 	{ID: MrpackHosts, On: true, Summary: "An mrpack downloads only from the hosts Modrinth allows, so a pack can't pull its files from anywhere else."},
