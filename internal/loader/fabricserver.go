@@ -34,11 +34,11 @@ func fabricEnsureServer(ctx context.Context, row Loader, r *Remote, lk *lock.Loc
 	if want := f.serverJarURL(lk.Minecraft, l.Version, l.Server.Installer); l.Server.URL != want {
 		return res, lockedElsewhere(row, "the server launcher", l.Server.URL)
 	}
-	if r.Cache.Has(l.Server.Sha512) {
+	if r.Cache.HasFrom(l.Server.Sha512, l.Server.URL) {
 		return res, nil
 	}
 	r.log("downloading the Fabric server launcher %s", l.Server.Installer)
-	if _, err := r.Cache.Ensure(ctx, r.Fetch, l.Server.URL, l.Server.Sha512); err != nil {
+	if _, err := r.Cache.EnsureFrom(ctx, r.Fetch, l.Server.URL, l.Server.Sha512); err != nil {
 		return res, err
 	}
 	res.WasFetched = true

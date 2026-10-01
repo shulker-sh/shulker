@@ -190,6 +190,10 @@ func TestInstallServerRunsTheLockedInstallerOffline(t *testing.T) {
 		lk := &lock.Lock{Minecraft: "26.2", Loader: lock.Loader{Type: name, Version: "1", Server: &lock.ServerJar{Sha512: sha}}}
 		if row := Running(lk); row.installerURL != nil {
 			lk.Loader.Server.URL = row.installerURL(r, lk.Minecraft, lk.Loader.Version)
+
+			if err := r.Cache.MarkFrom(sha, lk.Loader.Server.URL); err != nil {
+				t.Fatal(err)
+			}
 		}
 
 		if err := Running(lk).InstallServer(context.Background(), r, lk, "/srv", "/usr/bin/java"); err != nil {
@@ -312,5 +316,36 @@ func TestInstallerLibrariesMustBeTheInstallersOwn(t *testing.T) {
 	lk.Loader.Server.Libraries["org.ow2.asm:asm:9.10.1"] = swapped
 	if _, err := neoforge.EnsureServer(ctx, r, lk); out.CodeOf(err) != "checksum-mismatch" {
 		t.Fatalf("other bytes under a listed library: want checksum-mismatch, got %v", err)
+	}
+}
+
+func TestInstallerCachedFromAnotherAddressIsDownloadedAgain(t *testing.T) {
+	r, installer, _, _ := neoforgeRemote(t)
+	r.RunInstaller = func(context.Context, string, string, []string) error {
+		t.Fatal("a jar another address gave must not run as the installer")
+		return nil
+	}
+	ctx := context.Background()
+	planted, err := r.Cache.Put(strings.NewReader("a jar the lock also ships as a mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	published := r.URLs[NeoForgeMavenURL] + neoInstallerPath
+	locked := func(l lock.Loader) *lock.Lock {
+		l.Type, l.Version = "neoforge", "26.2.0.87"
+		return &lock.Lock{Minecraft: "26.2", Loader: l}
+	}
+
+	lk := locked(lock.Loader{Client: &lock.Download{URL: published, Sha512: planted}})
+	if _, err := neoforge.InstallClient(ctx, r, lk, "/launcher", "/usr/bin/java"); out.CodeOf(err) != "checksum-mismatch" || installer.hits != 1 {
+		t.Fatalf("client install: want checksum-mismatch after 1 download, got %v after %d", err, installer.hits)
+	}
+
+	lk = locked(lock.Loader{Server: &lock.ServerJar{URL: published, Sha512: planted}})
+	if err := neoforge.InstallServer(ctx, r, lk, "/srv", "/usr/bin/java"); out.CodeOf(err) != "provenance-mismatch" {
+		t.Fatalf("install server: want provenance-mismatch, got %v", err)
+	}
+	if _, err := neoforge.EnsureServer(ctx, r, lk); out.CodeOf(err) != "checksum-mismatch" || installer.hits != 2 {
+		t.Fatalf("ensure server: want checksum-mismatch after 2 downloads, got %v after %d", err, installer.hits)
 	}
 }

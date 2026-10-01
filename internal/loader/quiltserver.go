@@ -31,7 +31,7 @@ func quiltEnsureServer(ctx context.Context, row Loader, r *Remote, lk *lock.Lock
 			return res, err
 		}
 		res.WasFetched = true
-		if r.Cache.Has(locked.Sha512) {
+		if r.Cache.HasFrom(locked.Sha512, generatedServerJar) {
 			return res, nil
 		}
 		profile, err := q.serverProfile(ctx, lk.Minecraft, l.Version)
@@ -79,7 +79,11 @@ func putQuiltLaunchJar(r *Remote, profile *quiltServerProfile, libraries map[str
 	if err != nil {
 		return "", err
 	}
-	return r.Cache.Put(bytes.NewReader(jar))
+	sha, err := r.Cache.Put(bytes.NewReader(jar))
+	if err != nil {
+		return "", err
+	}
+	return sha, r.Cache.MarkFrom(sha, generatedServerJar)
 }
 
 func quiltLaunchJar(launcherMainClass, mainClass string, libraries []string) ([]byte, error) {

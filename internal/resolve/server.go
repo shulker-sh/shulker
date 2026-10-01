@@ -31,11 +31,11 @@ func (r *Resolver) ensureVanillaServer(ctx context.Context, piston *mojang.Pisto
 			return res, security.Refusal(security.Provenance, e)
 		}
 
-		if r.Cache.Has(locked.Sha512) {
+		if r.Cache.HasFrom(locked.Sha512, locked.URL) {
 			return res, nil
 		}
 		r.log("downloading the Minecraft %s server", r.Lock.Minecraft)
-		if _, err := r.Cache.Ensure(ctx, r.Fetch, locked.URL, locked.Sha512); err != nil {
+		if _, err := r.Cache.EnsureFrom(ctx, r.Fetch, locked.URL, locked.Sha512); err != nil {
 			return res, err
 		}
 		res.WasFetched = true

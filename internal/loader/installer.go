@@ -10,6 +10,7 @@ import (
 
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/security"
 )
 
 // InstallServer runs the loader's own installer into a built server dir. The build already placed
@@ -20,6 +21,11 @@ func (l Loader) InstallServer(ctx context.Context, r *Remote, lk *lock.Lock, dir
 	}
 	if err := l.checkInstallerURL(r, lk, "the server installer", lk.Loader.Server.URL); err != nil {
 		return err
+	}
+	if s := lk.Loader.Server; !r.Cache.HasFrom(s.Sha512, s.URL) {
+		e := out.Errorf("provenance-mismatch", "the %s installer in the cache isn't one %s served", l.Name, s.URL)
+		e.Help = "run `shulker install` to download it from there"
+		return security.Refusal(security.Provenance, e)
 	}
 	r.log("installing %s %s", l.Name, lk.Loader.Version)
 	return r.RunInstaller(ctx, java, r.Cache.Object(lk.Loader.Server.Sha512), []string{l.InstallServerFlag, dir, "--offline"})
@@ -59,11 +65,11 @@ func (l Loader) clientInstaller(ctx context.Context, r *Remote, lk *lock.Lock) (
 		if err := l.checkInstallerURL(r, lk, "the client installer", c.URL); err != nil {
 			return "", false, err
 		}
-		path, err := r.Cache.Ensure(ctx, r.Fetch, c.URL, c.Sha512)
+		path, err := r.Cache.EnsureFrom(ctx, r.Fetch, c.URL, c.Sha512)
 		return path, false, err
 	}
 	url := l.installerURL(r, lk.Minecraft, locked.Version)
-	if s := locked.Server; s != nil && s.URL == url && r.Cache.Has(s.Sha512) {
+	if s := locked.Server; s != nil && s.URL == url && r.Cache.HasFrom(s.Sha512, url) {
 		locked.Client = &lock.Download{URL: url, Sha512: s.Sha512}
 		return r.Cache.Object(s.Sha512), true, nil
 	}
@@ -90,7 +96,7 @@ func installerEnsureServer(ctx context.Context, l Loader, r *Remote, lk *lock.Lo
 			return res, checkInstallerLibraries(l, r.Cache, s)
 		}
 		r.log("downloading %s server files %s", l.Name, locked.Version)
-		if _, err := r.Cache.Ensure(ctx, r.Fetch, s.URL, s.Sha512); err != nil {
+		if _, err := r.Cache.EnsureFrom(ctx, r.Fetch, s.URL, s.Sha512); err != nil {
 			return res, err
 		}
 		res.WasFetched = true
