@@ -63,6 +63,27 @@ func TestImportLooksASlugUpAsAModpack(t *testing.T) {
 	}
 }
 
+func TestImportTakesTheVersionAPageURLNames(t *testing.T) {
+	h := newHarness(t)
+	older := hostedMrpack(t, h, "cozy-1.0.0.mrpack", "1.0.0")
+	newer := hostedMrpack(t, h, "cozy-1.1.0.mrpack", "1.1.0")
+	h.modrinthPacks = map[string]*modrinthPack{"COZYpack": {slug: "cozy", versions: []modrinthPackVersion{
+		{id: "cozyV110", number: "1.1.0", published: "2026-09-02T00:00:00Z", archive: newer},
+		{id: "cozyV100", number: "1.0.0", published: "2026-09-01T00:00:00Z", archive: older},
+	}}}
+	dir := filepath.Join(t.TempDir(), "cozy")
+	h.mustRun(t, "import", "-C", dir, "https://modrinth.com/modpack/cozy/version/cozyV100")
+	if m := importedManifest(t, dir); m.Version != "1.0.0" {
+		t.Fatalf("the URL names 1.0.0, got %s", m.Version)
+	}
+	if imported := readLockAt(t, dir).Imported; imported == nil || imported.Provider != "modrinth" || imported.Version != "cozyV100" {
+		t.Fatalf("the lock keeps the hosted version: %+v", imported)
+	}
+	if code, stdout, _ := h.run(t, "--json", "-C", filepath.Join(t.TempDir(), "x"), "import", "https://modrinth.com/modpack/cozy/version/cozyV100", "--provider", "curseforge"); code != out.ExitUsage || failureCode(t, stdout).Code != "usage" {
+		t.Fatalf("--provider curseforge on a Modrinth URL: exit %d: %s", code, stdout)
+	}
+}
+
 func TestImportRefusesASlugThatIsAMod(t *testing.T) {
 	h := newHarness(t)
 	code, stdout, _ := h.run(t, "--json", "-C", filepath.Join(t.TempDir(), "x"), "import", "terralith")

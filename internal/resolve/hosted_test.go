@@ -147,12 +147,41 @@ func TestAReimportNeverGoesBackPastTheVersionLastImported(t *testing.T) {
 	h := newHarness(t, cf)
 	was := &lock.Imported{Provider: "curseforge", Project: "800000", Version: "7000002", Sha512: sha512Hex([]byte("1.1"))}
 
-	pin, err := h.r.ObtainImport(context.Background(), "craftpack", manifest.Require{Type: manifest.TypeModpack}, was)
+	pin, err := h.r.ObtainImport(context.Background(), provider.Ref{Project: "craftpack"}, "", was)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if pin.VersionNumber != "1.1-beta" {
 		t.Fatalf("the project last imported 1.1-beta, so a re-import keeps it over the older release, got %s", pin.VersionNumber)
+	}
+}
+
+func TestAnImportOfAFileURLTakesThatFile(t *testing.T) {
+	cf := curseForgeHost(t)
+	craftpack := provider.Project{ID: "800000", Slug: "craftpack", Title: "Craft Pack", Type: manifest.TypeModpack}
+	cf.Publish(craftpack, provider.Version{ID: "7000001", Number: "1.0", Published: day(1), Loaders: []string{"fabric"}, File: provider.File{Filename: "craft-1.0.zip"}}, []byte("1.0"))
+	cf.Publish(craftpack, provider.Version{ID: "7000002", Number: "1.1", Published: day(2), Loaders: []string{"fabric"}, File: provider.File{Filename: "craft-1.1.zip"}}, []byte("1.1"))
+	h := newHarness(t, cf)
+	was := &lock.Imported{Provider: "curseforge", Project: "800000", Version: "7000002", Sha512: sha512Hex([]byte("1.1"))}
+
+	pin, err := h.r.ObtainImport(context.Background(), provider.Ref{Provider: "curseforge", Project: "craftpack", Version: "7000001"}, "", was)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if pin.Provider != "curseforge" || pin.Project != "800000" || pin.VersionNumber != "1.0" {
+		t.Fatalf("the URL names CurseForge's craftpack file 1.0, got %s %s %s", pin.Provider, pin.Project, pin.VersionNumber)
+	}
+}
+
+func TestAnImportURLDisagreeingWithProviderIsRefused(t *testing.T) {
+	cf := curseForgeHost(t)
+	h := newHarness(t, cf)
+
+	_, err := h.r.ObtainImport(context.Background(), provider.Ref{Provider: "curseforge", Project: "craftpack", Version: "7000001"}, "modrinth", nil)
+
+	if out.CodeOf(err) != "usage" {
+		t.Fatalf("--provider modrinth disagrees with a CurseForge URL, got %v", err)
 	}
 }

@@ -108,10 +108,23 @@ func (r *Resolver) ObtainModpack(ctx context.Context, name string, entry manifes
 	return r.obtainModpack(ctx, name, entry, nil)
 }
 
-// ObtainImport is ObtainModpack for an import, which never goes back past the version the project
-// was last imported from when that was the same pack.
-func (r *Resolver) ObtainImport(ctx context.Context, name string, entry manifest.Require, was *lock.Imported) (lock.Modpack, error) {
-	return r.obtainModpack(ctx, name, entry, was)
+// ObtainImport is ObtainModpack for an import of what u names: a slug on providerName, or the first
+// provider holding it, when u has no provider, and otherwise a provider URL's project, held at the
+// version the URL names. Unless held, it never goes back past the version the project was last
+// imported from when that was the same pack.
+func (r *Resolver) ObtainImport(ctx context.Context, u provider.Ref, providerName string, was *lock.Imported) (lock.Modpack, error) {
+	entry := manifest.Require{Type: manifest.TypeModpack, Provider: providerName}
+	if u.Provider != "" {
+		project, opts, err := r.FromURL(ctx, u, AddOptions{Provider: providerName})
+		if err != nil {
+			return lock.Modpack{}, err
+		}
+		entry.Provider, entry.Pin = opts.Provider, opts.Pin
+		if project != u.Project {
+			entry.Project = project
+		}
+	}
+	return r.obtainModpack(ctx, u.Project, entry, was)
 }
 
 func (r *Resolver) obtainModpack(ctx context.Context, name string, entry manifest.Require, was *lock.Imported) (lock.Modpack, error) {

@@ -234,14 +234,21 @@ func (a *app) importPack(ctx context.Context, d *deps, arc *packarchive.Archive,
 	return r, mods, nil
 }
 
-// findImport reads what an import argument names: an existing file as an archive and a folder
-// as a source; a URL as an archive by its content, else a git or manifest source; and anything
+// findImport reads what an import argument names: a provider URL as that hosted modpack; an
+// existing file as an archive and a folder as a source; any other URL as an archive by its
+// content, else a git or manifest source; and anything
 // else as a modpack slug, fitting target's platform when there is a target to merge into. It
 // returns the archive, or the source's checkout.
 func (a *app) findImport(ctx context.Context, d *deps, dir string, target *project.Project, arg string, f *importFlags) (*packarchive.Archive, *modpack.Checkout, *lock.Modpack, error) {
+	if u, ok, err := d.Providers.ParseURL(arg); err != nil || ok {
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		return a.importHosted(ctx, d, dir, target, u, f)
+	}
 	if !isImportURL(arg) {
 		if !looksLikePath(arg) {
-			return a.importHosted(ctx, d, dir, target, arg, f)
+			return a.importHosted(ctx, d, dir, target, provider.Ref{Project: arg}, f)
 		}
 		path, err := importPath(arg)
 		if err != nil {
@@ -327,9 +334,9 @@ func refuseImportFlags(f *importFlags, kind modpack.Kind) error {
 	return nil
 }
 
-// importHosted picks a hosted modpack's newest release that fits target's platform, or any
-// platform without a target, and reads its archive from the cache.
-func (a *app) importHosted(ctx context.Context, d *deps, dir string, target *project.Project, slug string, f *importFlags) (*packarchive.Archive, *modpack.Checkout, *lock.Modpack, error) {
+// importHosted picks the version of a hosted modpack that u names, or its newest release that fits
+// target's platform, or any platform without a target, and reads its archive from the cache.
+func (a *app) importHosted(ctx context.Context, d *deps, dir string, target *project.Project, u provider.Ref, f *importFlags) (*packarchive.Archive, *modpack.Checkout, *lock.Modpack, error) {
 	if err := refuseImportFlags(f, modpack.Hosted); err != nil {
 		return nil, nil, nil, err
 	}
@@ -339,7 +346,7 @@ func (a *app) importHosted(ctx context.Context, d *deps, dir string, target *pro
 	if target != nil {
 		r.Manifest, r.Lock, was = target.Manifest, target.Lock, target.Lock.Imported
 	}
-	pin, err := r.ObtainImport(ctx, slug, manifest.Require{Type: manifest.TypeModpack, Provider: f.provider}, was)
+	pin, err := r.ObtainImport(ctx, u, f.provider, was)
 	a.warn(r.Warnings)
 	for _, w := range r.AgeWarnings() {
 		a.printer.WarnSecurity(w)

@@ -8,6 +8,8 @@ All notable changes to shulker are documented here. The format is based on
 
 ### Added
 
+- `shulker import` takes a modpack's CurseForge file page or Modrinth version page URL, as `add` does, and imports that version from its provider rather than downloading the page. The lock remembers it, so importing the pack again by its slug never goes back past it.
+
 - A listing index in the cache remembers each Modrinth and CurseForge listing that `add`, `lock` or `import` proved to be the same, by a jar's mod id or a file's hash. `search` shows such a pair as one row, and adding the other listing of a locked mod no longer downloads its jar again. `cache info` counts the pairs and `cache prune` drops those unused for 90 days.
 
 - `shulker security` explains how shulker keeps bad files off your machine: its stance, each protection and what it stops, and the settings that change them. Every security warning and error now ends by pointing at it, and under `--json` a security error names the protection that refused in `error.protection`.
