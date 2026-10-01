@@ -419,6 +419,11 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 	if err != nil {
 		return nil, err
 	}
+	for rel := range desired {
+		if !fsutil.IsPortableLocal(rel) {
+			return nil, security.Refusal(security.Paths, out.Errorf("path-outside", "%s is outside the folder being built", rel))
+		}
+	}
 	if inPlace {
 		if err := checkReserved(side, desired, dirs); err != nil {
 			return nil, err
