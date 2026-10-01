@@ -34,6 +34,8 @@ All notable changes to shulker are documented here. The format is based on
 
 - `sync` at a terminal lists the mods it adds, the files no provider published and the entries now locked from another project, and asks before applying them. `--no-input`, `play`, `link` and the launcher hooks apply them and warn. The pack's entry in the in-game mod list shows a month of these changes by day, plus notices for files gone from their provider and jars changed since they were placed.
 
+- On NeoForge and Forge, the pack's entry in the mod list ends its description with the `links` that have no button there, such as `discord` or `source`, and names its icon for the Catalogue mod, which showed none.
+
 - On NeoForge for Minecraft 1.21.1 and later, validation applies the `dependencyOverrides` table of the `config/fml.toml` a build places, as it already applied Fabric Loader's `config/fabric_loader_dependencies.json`: a dependency the file removes is no longer reported as missing or mismatched.
 
 - `link`, `unlink` and `instances repair` tell whether Prism Launcher, MultiMC, ATLauncher and the Minecraft Launcher are open, as they could for GDLauncher on macOS and Linux, and GDLauncher on Windows too. An open launcher gets a plain "restart it", a closed one no reminder at all, and "restart it if it's open" is left for where shulker can't tell.

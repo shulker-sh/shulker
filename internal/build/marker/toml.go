@@ -3,6 +3,8 @@ package marker
 import (
 	"bytes"
 	"encoding/json"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -19,7 +21,12 @@ type tomlMeta struct {
 	LicenseURL      string    `toml:"licenseURL,omitempty"`
 	IssueTrackerURL string    `toml:"issueTrackerURL,omitempty"`
 	Mods            []tomlMod `toml:"mods"`
+	// ModProperties are a mod's custom properties by mod id, which other mods read.
+	ModProperties map[string]map[string]string `toml:"modproperties"`
 }
+
+// fmlLinkKeys are the links mods.toml has a key of its own for; the rest go in the description.
+var fmlLinkKeys = []string{"website", "license", "issues"}
 
 type tomlMod struct {
 	ModID       string `toml:"modId"`
@@ -49,13 +56,15 @@ func fml(l loader.Loader, info Info) ([]entry, error) {
 		LogoFile:    IconFile,
 		Authors:     strings.Join(info.Authors, ", "),
 		DisplayURL:  info.Links["website"],
-		Description: info.Description.render(plainText),
+		Description: fmlDescription(info).render(plainText),
 	}
 	meta := tomlMeta{
 		ModLoader:       l.MarkerModLoader,
 		License:         fmlLicense(info.License),
 		LicenseURL:      info.Links["license"],
 		IssueTrackerURL: info.Links["issues"],
+		// Catalogue draws its list icon from this property alone, on both loaders.
+		ModProperties: map[string]map[string]string{info.ID: {"catalogueImageIcon": IconFile}},
 	}
 	if l.MarkerModLoader != "" {
 		meta.LoaderVersion = "[1,)"
@@ -90,6 +99,23 @@ func fml(l loader.Loader, info Info) ([]entry, error) {
 		{"pack.mcmeta", pack},
 		{IconFile, Icon},
 	}, nil
+}
+
+// fmlDescription is the description with the links mods.toml has no key for listed beneath it, as
+// text: neither loader's mod list has a place for a link beyond the homepage and the issue tracker.
+func fmlDescription(info Info) Description {
+	d := info.Description
+	var links Section
+	for _, label := range slices.Sorted(maps.Keys(info.Links)) {
+		if !slices.Contains(fmlLinkKeys, label) {
+			links.Items = append(links.Items, Item{Text: label + ": " + info.Links[label]})
+		}
+	}
+	if len(links.Items) > 0 {
+		links.Title = "Links"
+		d.Sections = append(slices.Clone(d.Sections), links)
+	}
+	return d
 }
 
 // fmlLicense falls back rather than leaving the field empty, which both FML loaders read as a mod

@@ -139,6 +139,8 @@ func TestNeoForgeMarkerJar(t *testing.T) {
 			"website": "https://example.com",
 			"issues":  "https://example.com/issues",
 			"license": "https://example.com/license",
+			"source":  "https://example.com/source",
+			"discord": "https://d.gg/x",
 		}
 	})
 	for _, name := range []string{"META-INF/neoforge.mods.toml", "pack.mcmeta", "icon.png", "shulker.json", "shulker.lock", "shulker/mods.txt"} {
@@ -167,9 +169,13 @@ func TestNeoForgeMarkerJar(t *testing.T) {
 			DisplayURL  string `toml:"displayURL"`
 			Description string `toml:"description"`
 		} `toml:"mods"`
+		ModProperties map[string]map[string]string `toml:"modproperties"`
 	}
 	if err := toml.Unmarshal([]byte(entries["META-INF/neoforge.mods.toml"]), &meta); err != nil {
 		t.Fatal(err)
+	}
+	if got := meta.ModProperties["shulker_pack"]["catalogueImageIcon"]; got != "icon.png" {
+		t.Fatalf("Catalogue reads its icon from the mod's properties: %v", meta.ModProperties)
 	}
 	// Naming a language loader is what NeoForge warns about; left out, it uses the one that loads a
 	// mod declaring no code.
@@ -195,6 +201,12 @@ func TestNeoForgeMarkerJar(t *testing.T) {
 	}
 	if !strings.HasPrefix(mod.Description, "Survival with <friends>.\n\nMinecraft 26.2 • neoforge ") {
 		t.Fatalf("description should be plain text:\n%s", mod.Description)
+	}
+	if !strings.HasSuffix(mod.Description, "\n\nLinks\n  • discord: https://d.gg/x\n  • source: https://example.com/source") {
+		t.Fatalf("links with no key of their own end the description:\n%s", mod.Description)
+	}
+	if strings.Contains(mod.Description, "example.com/issues") || strings.Contains(mod.Description, "example.com/license") {
+		t.Fatalf("a link with a key of its own isn't repeated:\n%s", mod.Description)
 	}
 	if strings.ContainsAny(mod.Description, "\\") || strings.Contains(mod.Description, "<bold>") {
 		t.Fatalf("description should carry no QuickText tags:\n%s", mod.Description)

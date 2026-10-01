@@ -51,7 +51,7 @@ No other properties are allowed.
 
 ### links
 
-Links shown on the project's ModMenu entry. website, issues, and source become the Website, Issues, and Source buttons. A key ModMenu knows (discord, modrinth, curseforge, wiki, youtube, reddit, twitter, mastodon, twitch, patreon, kofi, paypal, donate, ...) uses its label; any other key is shown as written. On NeoForge and Forge, where the entry has room for less, website and issues become the Homepage and Issues buttons and license makes the license clickable.
+Links shown on the project's ModMenu entry. website, issues, and source become the Website, Issues, and Source buttons. A key ModMenu knows (discord, modrinth, curseforge, wiki, youtube, reddit, twitter, mastodon, twitch, patreon, kofi, paypal, donate, ...) uses its label; any other key is shown as written. On NeoForge and Forge, where the entry has room for less, website and issues become the Homepage and Issues buttons and license makes the license clickable, and every other link is listed as text at the end of the description.
 
 | Property | Type | Description |
 | --- | --- | --- |
