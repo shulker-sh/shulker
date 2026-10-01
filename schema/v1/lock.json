@@ -50,6 +50,7 @@
             "sha512": { "$ref": "#/$defs/sha512", "description": "The server launch jar: Fabric's bundled launcher, or the quilt-server-launch.jar shulker generates. NeoForge and Forge: their installer jar, which shulker runs offline into each server dir that doesn't have this loader version yet." },
             "libraries": {
               "type": "object",
+              "propertyNames": { "pattern": "^[A-Za-z0-9_+-][A-Za-z0-9._+-]*(:[A-Za-z0-9_+-][A-Za-z0-9._+-]*){2,3}(@[A-Za-z0-9]+)?$" },
               "additionalProperties": { "$ref": "#/$defs/download" },
               "description": "Quilt: the loader's libraries. NeoForge and Forge: every library their installer would download, so it runs offline. Keyed by Maven coordinate, placed under libraries/."
             }

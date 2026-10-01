@@ -14,3 +14,20 @@ func TestMavenPath(t *testing.T) {
 		}
 	}
 }
+
+func TestMavenPathRefusesAPathInACoordinate(t *testing.T) {
+	for _, name := range []string{
+		"a:b:1@x/../../../tmp/pwn.sh",
+		"a:../..:1",
+		"a:b:../../x",
+		"..:b:1",
+		"/etc:b:1",
+		`a:b\c:1`,
+		"a:b",
+		"a:b:1:c:d",
+	} {
+		if got, err := MavenPath(name); err == nil {
+			t.Errorf("%s: got %q, want an error", name, got)
+		}
+	}
+}
