@@ -143,9 +143,9 @@
   },
 
   "players": [
-    { "name": "AndrewMast", "uuid": "21dffd6e-b89b-4d18-8b3a-8227201e71be", "resolvedAt": "2026-09-09T14:20:03Z" },
-    { "name": "Ayrix", "uuid": "fead01dc-ec27-4e78-8c6b-e8b9a679be98", "resolvedAt": "2026-09-09T14:20:03Z" },
+    { "name": "Notch", "uuid": "069a79f4-44e9-4726-a5be-fca90e38aaf5", "resolvedAt": "2026-09-09T14:20:03Z" },
+    { "name": "jeb_", "uuid": "853c80ef-3c37-49fd-aa49-938b674adae6", "resolvedAt": "2026-09-09T14:20:03Z" },
     { "name": "Griefer99", "uuid": "9c1e4b7a-2d5f-4a8b-b3c6-0e7d1f2a3b4c", "resolvedAt": "2026-09-09T14:20:03Z" },
-    { "name": "Kestrel_", "uuid": "7371a875-977e-4b88-9088-9c6b758acf5b", "resolvedAt": "2026-09-09T14:20:03Z" }
+    { "name": "Dinnerbone", "uuid": "61699b2e-d327-4a01-9f1e-0ea8c3f06bc6", "resolvedAt": "2026-09-09T14:20:03Z" }
   ]
 }
