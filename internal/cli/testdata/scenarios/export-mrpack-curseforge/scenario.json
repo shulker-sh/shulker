@@ -1,0 +1,16 @@
+{
+  "steps": [
+    {
+      "run": ["create", "--fabric", "--minecraft", "1.21.1", "--json"],
+      "expect": {"ok": true}
+    },
+    {
+      "run": ["add", "fabric-api", "jei", "--provider", "curseforge", "--json"],
+      "expect": {"ok": true, "data": {"added": [{"id": "jei", "provider": "curseforge"}]}}
+    },
+    {
+      "run": ["export", "mrpack", "--version", "1.0.0", "--json"],
+      "expect": {"ok": false, "error": {"code": "mrpack-host-not-allowed"}}
+    }
+  ]
+}
