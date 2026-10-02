@@ -405,6 +405,41 @@ func TestAnExactVersionAskedOfAHeldModWarns(t *testing.T) {
 	}
 }
 
+func TestAnExactAskForTheHeldVersionSaysNothing(t *testing.T) {
+	h := pinnedSodium(t)
+	h.mustAdd("sodium", AddOptions{})
+	h.mustAdd("iris", AddOptions{})
+
+	h.nextCommand()
+	if err := h.r.Remove([]string{"iris"}); err != nil {
+		t.Fatal(err)
+	}
+
+	h.nextCommand()
+	h.mustAdd("iris", AddOptions{})
+
+	if got := h.mod("sodium"); got.VersionNumber != "0.9.2" || !slices.Contains(got.RequiredBy, "iris") {
+		t.Fatalf("sodium is already at the version iris asks for: %+v", got)
+	}
+	if len(h.r.Warnings) > 0 || len(h.notes) > 0 {
+		t.Fatalf("warnings %q, notes %+v", h.r.Warnings, h.notes)
+	}
+}
+
+func TestAnExactAskForThePinnedVersionSaysNothing(t *testing.T) {
+	h := pinnedSodium(t)
+
+	h.mustAdd("sodium", AddOptions{Pin: "s-092"})
+	h.mustAdd("iris", AddOptions{})
+
+	if got := h.mod("sodium"); got.VersionNumber != "0.9.2" || !slices.Contains(got.RequiredBy, "iris") {
+		t.Fatalf("the pin is the version iris asks for: %+v", got)
+	}
+	if len(h.r.Warnings) > 0 {
+		t.Fatalf("warnings %q", h.r.Warnings)
+	}
+}
+
 func TestWithDepsMovesAHeldModToTheExactVersionAskedFor(t *testing.T) {
 	h := pinnedSodium(t)
 	h.mustAdd("sodium", AddOptions{})

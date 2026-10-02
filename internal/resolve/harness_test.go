@@ -90,6 +90,7 @@ func (h *harness) mustAdd(slug string, opts AddOptions) {
 func (h *harness) nextCommand() {
 	next := *h.r
 	next.locked = nil
+	next.exact = nil
 	h.r = &next
 }
 
