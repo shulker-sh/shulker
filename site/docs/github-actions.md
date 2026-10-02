@@ -92,6 +92,8 @@ git push origin v1.2.0
 
 Export reads every locked file from Shulker's cache, and downloads the ones a fresh checkout is missing. The action keeps that cache between runs, keyed on `shulker.lock`: while the lock is unchanged the export downloads nothing, and after a change it starts from the previous cache and downloads only what's new. It then prunes the files the new lock no longer needs, so the cache doesn't grow with every change.
 
+GitHub only lets a run restore a cache saved on its own branch or tag, or on the default branch. A cache saved by one tag's release is out of reach of the next tag's, so a release reuses the cache only when a run on the default branch saved it. The [check workflow](#check-on-push) does that on every push; without it, each release downloads every file again.
+
 A pack that isn't at the root of its repository names its lock with `lock-files`, one path per line. A repository holding several packs lists each one's lock. The cache is then keyed on all of them, and a prune keeps what any of them needs:
 
 ```yaml
