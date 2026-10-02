@@ -430,7 +430,7 @@ func printChanges(l *out.Lines, c *resolve.Changes, suggestions []resolve.Sugges
 		case p.From == "":
 			items = append(items, out.Item{Kind: out.Add, Name: p.Name, Version: p.To, Aside: []string{"modpack"}})
 		case p.To == "":
-			items = append(items, out.Item{Kind: out.Drop, Name: p.Name, Aside: []string{"modpack"}})
+			items = append(items, out.Item{Kind: out.Drop, Name: p.Name, Version: p.From, Aside: []string{"modpack"}})
 		default:
 			items = append(items, out.Item{Kind: out.Change, Name: p.Name, From: p.From, To: p.To, Aside: []string{"modpack"}})
 		}
@@ -472,7 +472,7 @@ func printChanges(l *out.Lines, c *resolve.Changes, suggestions []resolve.Sugges
 		items = append(items, it)
 	}
 	for _, m := range c.Removed {
-		it := out.Item{Kind: out.Drop, Name: m.ID}
+		it := out.Item{Kind: out.Drop, Name: m.ID, Version: m.VersionNumber}
 		switch {
 		case m.StillLocked:
 			it.Aside = []string{"from shulker.json, still locked"}

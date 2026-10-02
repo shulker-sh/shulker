@@ -180,7 +180,7 @@ func TestLocalModpack(t *testing.T) {
 	}
 
 	stdout = h.mustRun(t, "modpack", "remove", "base")
-	if !strings.Contains(stdout, "- fabric-api (was required by sodium)") || !strings.Contains(stdout, "- sodium (was required by base)") {
+	if !strings.Contains(stdout, "- fabric-api 1.0.0+mc26.2 (was required by sodium)") || !strings.Contains(stdout, "- sodium     1.0.0+mc26.2 (was required by base)") {
 		t.Fatalf("modpack remove output: %s", stdout)
 	}
 	l = readLock(t, h)
@@ -418,7 +418,7 @@ func TestURLModpackAndHandEdits(t *testing.T) {
 
 	h.editManifest(t, func(m map[string]any) { m["requires"] = map[string]any{} })
 	stdout = h.mustRun(t, "update")
-	if !strings.Contains(stdout, "- tiny (modpack)") || !strings.Contains(stdout, "- local (modpack)") || !strings.Contains(stdout, "- sodium") {
+	if !strings.Contains(stdout, "- tiny ") || !strings.Contains(stdout, "- local ") || !strings.Contains(stdout, "- sodium     1.0.0+mc26.2") {
 		t.Fatalf("update after removing modpacks: %s", stdout)
 	}
 	if l = readLock(t, h); len(l.Packs) != 0 || len(l.Mods) != 0 {
