@@ -11,9 +11,10 @@
 #      that GitHub Actions built it in the shulker-sh organization, not someone's laptop.
 #   5. Copies the shulker binary into ~/.local/bin, or SHULKER_INSTALL_DIR.
 #   6. If that directory is not on your PATH, appends one line to your shell's startup
-#      file (~/.zshrc, ~/.bashrc, ...) to add it.
+#      file (~/.zshrc, ~/.bashrc, ...) to add it, and for bash on Linux to ~/.bash_profile
+#      or ~/.bash_login too when a login shell would read that file and not ~/.bashrc.
 #
-# It never uses sudo. Besides the install directory and that one startup-file line, it
+# It never uses sudo. Besides the install directory and that startup-file line, it
 # only writes to a temporary directory, which it deletes on exit.
 #
 # Options, as a flag or an environment variable:
@@ -201,6 +202,17 @@ elif [ -n "$NO_MODIFY_PATH" ]; then
   next="Add $(tilde "$INSTALL_DIR") to your PATH, then run ${cmd}shulker --help${reset} to get started."
 else
   line="export PATH=\"$INSTALL_DIR:\$PATH\""
+  login_rc=""
+
+  add_to_path() {
+    if [ -f "$1" ] && grep -qF "$line" "$1"; then
+      ok "$(tilde "$1") already adds $(tilde "$INSTALL_DIR") to PATH"
+    elif mkdir -p "$(dirname "$1")" 2>/dev/null && printf '\n# Added by the shulker installer\n%s\n' "$line" 2>/dev/null >> "$1"; then
+      ok "Added $(tilde "$INSTALL_DIR") to PATH in $(tilde "$1")"
+    else
+      fail "Couldn't add $(tilde "$INSTALL_DIR") to PATH in $(tilde "$1"); rerun with --no-modify-path to skip it"
+    fi
+  }
 
   case "$(basename "${SHELL:-sh}")" in
     zsh)
@@ -212,6 +224,15 @@ else
         rc="$HOME/.bash_profile"
       else
         rc="$HOME/.bashrc"
+
+        # A login shell, which WSL and ssh start, reads only the first of these that exists, and
+        # reaches .bashrc only when that file sources it.
+        for profile in "$HOME/.bash_profile" "$HOME/.bash_login"; do
+          if [ -f "$profile" ]; then
+            grep -v '^[[:space:]]*#' "$profile" | grep -q 'bashrc' || login_rc="$profile"
+            break
+          fi
+        done
       fi
       ;;
     fish)
@@ -223,12 +244,10 @@ else
       ;;
   esac
 
-  if [ -f "$rc" ] && grep -qF "$line" "$rc"; then
-    ok "$(tilde "$rc") already adds $(tilde "$INSTALL_DIR") to PATH"
-  elif mkdir -p "$(dirname "$rc")" 2>/dev/null && printf '\n# Added by the shulker installer\n%s\n' "$line" 2>/dev/null >> "$rc"; then
-    ok "Added $(tilde "$INSTALL_DIR") to PATH in $(tilde "$rc")"
-  else
-    fail "Couldn't add $(tilde "$INSTALL_DIR") to PATH in $(tilde "$rc"); rerun with --no-modify-path to skip it"
+  add_to_path "$rc"
+
+  if [ -n "$login_rc" ]; then
+    add_to_path "$login_rc"
   fi
 
   next="Open a new terminal, then run ${cmd}shulker --help${reset} to get started."

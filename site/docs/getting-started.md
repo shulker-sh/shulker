@@ -22,7 +22,7 @@ irm https://shulker.sh/install.ps1 | iex
 
 The installer downloads the latest release and verifies its checksum, and when the [GitHub CLI](https://cli.github.com/) is installed it also checks the build provenance, then installs `shulker` to `~/.local/bin` (on Windows, `%LOCALAPPDATA%\Programs\shulker`) and adds that directory to your PATH. Once installed, `shulker self update` updates it to the latest Shulker release on GitHub. The archives, `checksums.txt` and the attestation bundle are on the [releases page](https://github.com/shulker-sh/shulker/releases), and the repository's [Building from Source](https://github.com/shulker-sh/shulker#building-from-source) covers `go install` and building from a clone.
 
-To uninstall, run `shulker self uninstall`. It takes shulker out of every launcher it hooked and removes the binary, and leaves your instances and worlds where they are. Then take the install directory off your PATH: on macOS and Linux, delete the line marked `# Added by the shulker installer` from your shell's startup file; on Windows, search Start for "Edit environment variables for your account" and remove it from `Path`.
+To uninstall, run `shulker self uninstall`. It takes shulker out of every launcher it hooked and removes the binary, and leaves your instances and worlds where they are. Then take the install directory off your PATH: on macOS and Linux, delete the line marked `# Added by the shulker installer` from your shell's startup file, and from `~/.bash_profile` or `~/.bash_login` if the installer said it added one there; on Windows, search Start for "Edit environment variables for your account" and remove it from `Path`.
 
 ## Create a Project
 
