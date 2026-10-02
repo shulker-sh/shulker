@@ -6,6 +6,8 @@ All notable changes to shulker are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.0.1] - 2026-10-02
+
 The first release of shulker, a package manager for Minecraft modpacks. A pack is a `shulker.json` you edit and a `shulker.lock` that records exact versions and hashes, so every machine builds the same pack.
 
 ### Added
@@ -27,4 +29,5 @@ The first release of shulker, a package manager for Minecraft modpacks. A pack i
 - `--json` on every command with stable error codes, `docs` for the documentation offline, shell completions, and `self update`.
 - Installers for macOS, Linux and Windows ([Getting Started](https://shulker.sh/docs/getting-started)).
 
-[Unreleased]: https://github.com/shulker-sh/shulker/commits/master
+[Unreleased]: https://github.com/shulker-sh/shulker/compare/v0.0.1...HEAD
+[0.0.1]: https://github.com/shulker-sh/shulker/releases/tag/v0.0.1
