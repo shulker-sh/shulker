@@ -2185,7 +2185,7 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `instance-id-taken` | Another instance already has the `--as` id; the message names its directory |
 | `instance-invalid` | An instance's `.shulker/instance.json` isn't valid JSON (the message names the line and column), names a `$schema` this shulker doesn't know or names none, or doesn't match its schema; `shulker instances repair` writes it again, keeping the old file as `.shulker/instance.json.replaced` |
 | `instance-missing` | A linked instance's directory is gone |
-| `instance-not-found` | No instance matches, or the directory `shulker instance` acts on holds no `.shulker/instance.json`. `candidates`: the instances shulker knows, `pass`: their ids |
+| `instance-not-found` | No instance matches, `-i` names a folder that isn't a registered instance, or the directory `shulker instance` acts on holds no `.shulker/instance.json`. `candidates`: the instances shulker knows, `pass`: their ids |
 | `interrupted` | Ctrl-C or SIGTERM stopped the command. Files are left whole: each one is written in full or not at all. A second Ctrl-C quits at once |
 | `into-missing` | The `--into` directory does not exist |
 | `into-required` | Syncing from a remote source needs `--into` |

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -62,6 +63,11 @@ func (a *app) selectInstances(query string, s instanceSelection) ([]project.Inst
 	pool := s.Narrow(entries)
 	matches := project.MatchInstances(pool, query)
 	if len(matches) == 0 {
+		if dir, err := filepath.Abs(query); err == nil && query != "" {
+			if info, err := os.Stat(dir); err == nil && info.IsDir() {
+				return nil, notRegistered(dir)
+			}
+		}
 		e := out.Errorf("instance-not-found", "no instance matches %s", describeSelection(query, s))
 		e.Candidates, e.Pass, e.Given = instanceCandidates(pool), instanceIDs(pool), query
 		if len(pool) == 0 {

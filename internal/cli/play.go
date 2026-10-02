@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/play"
 	"shulker.sh/shulker/internal/project"
@@ -418,7 +420,10 @@ func (a *app) playInstance(cmd *cobra.Command, args []string, create bool) (conf
 
 func notRegistered(dir string) error {
 	e := out.Errorf("instance-not-found", "%s is not a registered instance", dir)
-	e.Help = "`shulker link shulker` makes one shulker launches itself"
+	e.Help = "`shulker instances` lists the registered ones"
+	if _, err := os.Stat(filepath.Join(dir, manifest.FileName)); err == nil {
+		e.Help = "`shulker link shulker` makes one shulker launches itself"
+	}
 	return e
 }
 

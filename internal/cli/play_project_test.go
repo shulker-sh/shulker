@@ -44,6 +44,23 @@ func TestPlayInAProjectWithNoInstanceFailsWithoutATerminal(t *testing.T) {
 	}
 }
 
+func TestPlayInAFolderThatIsNeitherInstanceNorProjectSaysSo(t *testing.T) {
+	h := newHarness(t)
+	projectPlayHarness(t, h)
+	h.mustRun(t, "link", "prism", "--launcher-dir", t.TempDir(), "--name", "Friends")
+	bare := t.TempDir()
+
+	h.dir = ""
+
+	for _, args := range [][]string{{"play", "-i", bare, "--dry-run", "--json"}, {"play", "-C", bare, "--dry-run", "--json"}} {
+		code, stdout, _ := h.run(t, args...)
+
+		if code == 0 || !strings.Contains(stdout, "is not a registered instance") || !strings.Contains(stdout, "shulker instances") || strings.Contains(stdout, "shulker link shulker") {
+			t.Fatalf("%v: a folder with no project can't be linked, so the help lists the instances instead: %s", args, stdout)
+		}
+	}
+}
+
 func TestPlayInAProjectWithNoInstanceOffersToCreateOne(t *testing.T) {
 	h := newHarness(t)
 	root := projectPlayHarness(t, h)
